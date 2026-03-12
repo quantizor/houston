@@ -1,5 +1,18 @@
 import Foundation
 
+/// Runtime information from `launchctl print`, not available from plist alone.
+public struct ServiceInfo: Sendable, Equatable {
+    public var runs: Int?
+    public var lastExitReason: String?
+    public var spawnType: String?
+    public var activeCount: Int?
+    public var forks: Int?
+    public var execs: Int?
+    public var processStartTime: Date?
+
+    public init() {}
+}
+
 public struct LaunchdJob: Identifiable, Sendable {
     public let id: String
     public var label: String

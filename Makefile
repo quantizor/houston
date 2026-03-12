@@ -1,137 +1,173 @@
-# Houston — macOS launchd GUI
-# Common development commands
+# Houston
 
 .DEFAULT_GOAL := help
 
-# ──────────────────────────────────────────────
-# Build
-# ──────────────────────────────────────────────
+# Build ────────────────────────────────────────
 
 .PHONY: build
-build: ## Build HoustonKit SPM package
+build: ## Build the package
 	cd HoustonKit && swift build 2>&1 | tail -2
 
 .PHONY: build-release
-build-release: ## Build HoustonKit in release mode
+build-release: ## Build the package (release)
 	cd HoustonKit && swift build -c release 2>&1 | tail -2
 
 .PHONY: build-app
-build-app: ## Build the full Houston app via xcodebuild
+build-app: ## Build the app
 	@xcodebuild -scheme Houston -configuration Debug -destination 'platform=macOS,arch=arm64' build -quiet
 
 .PHONY: build-app-release
-build-app-release: ## Build the Houston app in release configuration
+build-app-release: ## Build the app (release)
 	@xcodebuild -scheme Houston -configuration Release -destination 'platform=macOS,arch=arm64' build -quiet
 
 .PHONY: install
-install: build-app-release ## Build release and copy to /Applications
+install: build-app-release ## Build and install to /Applications
 	@echo ""
 	@printf "  Installing to /Applications..."
 	@cp -R "$$(xcodebuild -scheme Houston -configuration Release -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $$NF}')/Houston.app" /Applications/
 	@echo " done."
 	@echo ""
-	@printf "  \033[1mH O U S T O N   I S   G O\033[0m\n"
+	@printf "  \033[1mHOUSTON IS GO\033[0m\n"
 	@echo ""
 
-# ──────────────────────────────────────────────
-# Test
-# ──────────────────────────────────────────────
+# Test ─────────────────────────────────────────
 
 .PHONY: test
-test: ## Run all HoustonKit tests
+test: ## Run tests
 	@cd HoustonKit && swift test 2>&1 | awk '/tests in .* suites/{print ""; print; next} /Suite .* passed/{next} /Test .* passed/{printf "."; next} /Test .* failed/{printf "F"; print; next} /error:/{print; next}'
 
 .PHONY: test-verbose
-test-verbose: ## Run tests with verbose output
+test-verbose: ## Run tests (verbose)
 	cd HoustonKit && swift test --verbose
 
 .PHONY: test-module
-test-module: ## Run tests for a single module (usage: make test-module MOD=Models)
+test-module: ## Run one module's tests (MOD=Models)
 	cd HoustonKit && swift test --filter $(MOD)Tests
 
-# ──────────────────────────────────────────────
-# Lint & Format
-# ──────────────────────────────────────────────
+# Lint ─────────────────────────────────────────
 
 .PHONY: lint
-lint: ## Lint Swift files with swiftlint (if installed)
+lint: ## Lint with swiftlint
 	@if command -v swiftlint >/dev/null 2>&1; then \
 		swiftlint lint --quiet; \
 	else \
-		echo "swiftlint not found — install with: brew install swiftlint"; \
+		echo "swiftlint not found — brew install swiftlint"; \
 	fi
 
 .PHONY: format
-format: ## Format Swift files with swift-format (if installed)
+format: ## Format with swift-format
 	@if command -v swift-format >/dev/null 2>&1; then \
 		find HoustonKit/Sources HoustonKit/Tests Houston -name '*.swift' | xargs swift-format -i; \
 	else \
-		echo "swift-format not found — install with: brew install swift-format"; \
+		echo "swift-format not found — brew install swift-format"; \
 	fi
 
-# ──────────────────────────────────────────────
-# Clean
-# ──────────────────────────────────────────────
+# Release ─────────────────────────────────────
+
+SCHEME       := Houston
+APP_NAME     := Houston
+BUILD_DIR    := build
+ARCHIVE_PATH := $(BUILD_DIR)/Houston.xcarchive
+EXPORT_PATH  := $(BUILD_DIR)/export
+VERSION      := $(shell xcodebuild -scheme $(SCHEME) -showBuildSettings 2>/dev/null | grep MARKETING_VERSION | awk '{print $$NF}')
+ARCH         := $(shell uname -m)
+DMG_NAME     := Houston-$(VERSION)-$(ARCH).dmg
+DMG_PATH     := $(BUILD_DIR)/$(DMG_NAME)
+
+.PHONY: archive
+archive: ## Archive signed release build
+	@mkdir -p $(BUILD_DIR)
+	@printf "  Archiving..."
+	@xcodebuild archive \
+		-scheme $(SCHEME) \
+		-configuration Release \
+		-destination 'generic/platform=macOS' \
+		-archivePath $(ARCHIVE_PATH) \
+		-quiet
+	@echo " done."
+
+.PHONY: export
+export: archive ## Export signed .app from archive
+	@printf "  Exporting..."
+	@xcodebuild -exportArchive \
+		-archivePath $(ARCHIVE_PATH) \
+		-exportPath $(EXPORT_PATH) \
+		-exportOptionsPlist ExportOptions.plist \
+		-quiet
+	@echo " done."
+
+.PHONY: notarize
+notarize: export ## Notarize the exported .app
+	@printf "  Notarizing..."
+	@ditto -c -k --keepParent "$(EXPORT_PATH)/$(APP_NAME).app" "$(BUILD_DIR)/Houston-notarize.zip"
+	@xcrun notarytool submit "$(BUILD_DIR)/Houston-notarize.zip" \
+		--keychain-profile "Houston" \
+		--wait
+	@xcrun stapler staple "$(EXPORT_PATH)/$(APP_NAME).app"
+	@rm "$(BUILD_DIR)/Houston-notarize.zip"
+	@echo " done."
+
+.PHONY: dmg
+dmg: notarize ## Create notarized DMG
+	@printf "  Creating DMG..."
+	@mkdir -p "$(BUILD_DIR)/dmg-staging"
+	@cp -R "$(EXPORT_PATH)/$(APP_NAME).app" "$(BUILD_DIR)/dmg-staging/"
+	@ln -sf /Applications "$(BUILD_DIR)/dmg-staging/Applications"
+	@hdiutil create -volname "Houston" \
+		-srcfolder "$(BUILD_DIR)/dmg-staging" \
+		-ov -format UDZO \
+		"$(DMG_PATH)" >/dev/null
+	@rm -rf "$(BUILD_DIR)/dmg-staging"
+	@xcrun notarytool submit "$(DMG_PATH)" \
+		--keychain-profile "Houston" \
+		--wait
+	@xcrun stapler staple "$(DMG_PATH)"
+	@echo " done."
+	@echo ""
+	@printf "  \033[1m$(DMG_NAME)\033[0m\n"
+	@echo ""
+
+.PHONY: release
+release: dmg ## Full release pipeline (archive + sign + notarize + DMG)
+	@printf "  \033[32mRelease ready:\033[0m $(DMG_PATH)\n\n"
+
+# Clean ────────────────────────────────────────
 
 .PHONY: clean
-clean: ## Clean SPM build artifacts
+clean: ## Clean build artifacts
 	cd HoustonKit && swift package clean
 
 .PHONY: clean-all
-clean-all: clean ## Clean SPM + Xcode derived data
+clean-all: clean ## Clean everything
 	@xcodebuild -scheme Houston clean -quiet 2>/dev/null || true
 	@rm -rf ~/Library/Developer/Xcode/DerivedData/Houston-*
+	@rm -rf build
 
 .PHONY: reset
-reset: ## Full reset: clean + resolve packages
+reset: ## Clean + resolve packages
 	cd HoustonKit && swift package clean && swift package resolve
 
-# ──────────────────────────────────────────────
-# Xcode
-# ──────────────────────────────────────────────
+# Helpers ──────────────────────────────────────
 
 .PHONY: open
-open: ## Open the project in Xcode
-	@if [ -d Houston.xcodeproj ]; then \
-		open Houston.xcodeproj; \
-	else \
-		echo "Houston.xcodeproj not found — create it in Xcode first"; \
-	fi
+open: ## Open in Xcode
+	@open Houston.xcodeproj
 
 .PHONY: resolve
 resolve: ## Resolve SPM dependencies
 	cd HoustonKit && swift package resolve
 
-# ──────────────────────────────────────────────
-# Utilities
-# ──────────────────────────────────────────────
-
-.PHONY: fixtures
-fixtures: ## Validate test fixture plists
-	@echo "Validating test fixtures..."
-	@for f in TestFixtures/*.plist; do \
-		if plutil -lint "$$f" >/dev/null 2>&1; then \
-			echo "  ✓ $$f"; \
-		else \
-			echo "  ✗ $$f"; \
-			plutil -lint "$$f"; \
-		fi \
-	done
-
 .PHONY: loc
-loc: ## Count lines of Swift code
-	@echo "HoustonKit:"
-	@find HoustonKit/Sources -name '*.swift' | xargs wc -l | tail -1
-	@echo "App:"
-	@find Houston -name '*.swift' | xargs wc -l | tail -1
-	@echo "Tests:"
-	@find HoustonKit/Tests -name '*.swift' | xargs wc -l | tail -1
+loc: ## Count lines of code
+	@printf "  package  " && find HoustonKit/Sources -name '*.swift' | xargs wc -l | tail -1 | awk '{print $$1}'
+	@printf "  app      " && find Houston -name '*.swift' | xargs wc -l | tail -1 | awk '{print $$1}'
+	@printf "  tests    " && find HoustonKit/Tests -name '*.swift' | xargs wc -l | tail -1 | awk '{print $$1}'
 
-# ──────────────────────────────────────────────
-# Help
-# ──────────────────────────────────────────────
+# Help ─────────────────────────────────────────
 
 .PHONY: help
-help: ## Show this help
+help: ## Show commands
+	@printf "\n  \033[1mHouston\033[0m\n\n"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo ""

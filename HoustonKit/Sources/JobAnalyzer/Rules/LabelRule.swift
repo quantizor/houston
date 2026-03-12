@@ -11,12 +11,15 @@ public struct LabelRule: AnalysisRule {
         var results: [AnalysisResult] = []
 
         guard let label = plistContents["Label"] as? String else {
+            let isEmpty = plistContents.isEmpty
             results.append(AnalysisResult(
                 severity: .error,
-                title: "Missing Label",
-                description: "The plist is missing the required Label key.",
+                title: isEmpty ? "Empty plist" : "Missing Label",
+                description: isEmpty
+                    ? "This plist has no keys — it may be leftover from an uninstalled app."
+                    : "The plist is missing the required Label key.",
                 key: "Label",
-                suggestion: "Add a Label key with a unique reverse-DNS identifier."
+                suggestion: isEmpty ? "Safe to delete." : "Add a Label key matching the filename."
             ))
             return results
         }

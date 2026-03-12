@@ -60,6 +60,7 @@ public struct LaunchctlExecutor: Sendable {
             do {
                 try process.run()
             } catch {
+                process.terminationHandler = nil
                 continuation.resume(throwing: error)
             }
         }
@@ -116,6 +117,75 @@ public struct LaunchctlExecutor: Sendable {
             throw LaunchctlError.commandFailed(exitCode: result.exitCode, stderr: result.stderr)
         }
         return result.stdout
+    }
+
+    /// Fetch runtime info for a specific service via `launchctl print`.
+    public func serviceInfo(serviceTarget: String) async -> ServiceInfo {
+        var info = ServiceInfo()
+        guard let result = try? await run(["print", serviceTarget]),
+              result.exitCode == 0 else {
+            return info
+        }
+
+        let output = result.stdout
+        info.runs = Self.parseInt(from: output, key: "runs")
+        info.activeCount = Self.parseInt(from: output, key: "active count")
+        info.forks = Self.parseInt(from: output, key: "forks")
+        info.execs = Self.parseInt(from: output, key: "execs")
+        info.lastExitReason = Self.parseString(from: output, key: "last exit reason")
+        info.spawnType = Self.parseString(from: output, key: "spawn type")
+
+        return info
+    }
+
+    /// Fetch process start time via `ps` for a running PID.
+    public func processStartTime(pid: Int) async -> Date? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-p", "\(pid)", "-o", "lstart="]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            return try await withCheckedThrowingContinuation { continuation in
+                process.terminationHandler = { _ in
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    guard let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !str.isEmpty else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.dateFormat = "EEE MMM dd HH:mm:ss yyyy"
+                    continuation.resume(returning: formatter.date(from: str))
+                }
+                do {
+                    try process.run()
+                } catch {
+                    process.terminationHandler = nil
+                    continuation.resume(returning: nil)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    private static func parseInt(from output: String, key: String) -> Int? {
+        guard let range = output.range(of: "\(key) = ") else { return nil }
+        let rest = output[range.upperBound...]
+        let line = rest.prefix(while: { $0 != "\n" && $0 != "\t" })
+        return Int(line.trimmingCharacters(in: .whitespaces))
+    }
+
+    private static func parseString(from output: String, key: String) -> String? {
+        guard let range = output.range(of: "\(key) = ") else { return nil }
+        let rest = output[range.upperBound...]
+        let line = rest.prefix(while: { $0 != "\n" })
+        let value = line.trimmingCharacters(in: .whitespaces)
+        return value.isEmpty ? nil : value
     }
 
     // MARK: - Parsing

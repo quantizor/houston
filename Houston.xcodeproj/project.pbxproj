@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -18,13 +18,16 @@
 		A1B2C3D4E5F60001000011AA /* MenuBarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000012AA /* MenuBarWidget.swift */; };
 		A1B2C3D4E5F60001000013AA /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000014AA /* SidebarView.swift */; };
 		A1B2C3D4E5F60001000015AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000016AA /* Assets.xcassets */; };
-		A1B2C3D4E5F60001000026AA /* DockIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000027AA /* DockIcon.png */; };
 		A1B2C3D4E5F60001000017AA /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60001000018AA /* Models */; };
 		A1B2C3D4E5F60001000019AA /* LaunchdService in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F6000100001AAA /* LaunchdService */; };
 		A1B2C3D4E5F6000100001BAA /* PrivilegedHelper in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F6000100001CAA /* PrivilegedHelper */; };
 		A1B2C3D4E5F6000100001DAA /* JobAnalyzer in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F6000100001EAA /* JobAnalyzer */; };
 		A1B2C3D4E5F6000100001FAA /* LogViewer in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60001000020AA /* LogViewer */; };
 		A1B2C3D4E5F60001000021AA /* PlistEditor in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60001000022AA /* PlistEditor */; };
+		A1B2C3D4E5F60001000026AA /* DockIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000027AA /* DockIcon.png */; };
+		A1B2C3D4E5F60001000028AA /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000029AA /* ToastView.swift */; };
+		A1B2C3D4E5F6000100002AAA /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000100002BAA /* DesignTokens.swift */; };
+		A1B2C3D4E5F6000100002CAA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000100002DAA /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,14 +44,16 @@
 		A1B2C3D4E5F60001000016AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000023AA /* Houston.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Houston.entitlements; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000024AA /* Houston.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Houston.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1B2C3D4E5F60001000025AA /* HoustonKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = HoustonKit; path = HoustonKit; sourceTree = "<group>"; };
+		A1B2C3D4E5F60001000025AA /* HoustonKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HoustonKit; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000027AA /* DockIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DockIcon.png; sourceTree = "<group>"; };
+		A1B2C3D4E5F60001000029AA /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000100002BAA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000100002DAA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1B2C3D4E5F60001000030AA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F60001000017AA /* Models in Frameworks */,
 				A1B2C3D4E5F60001000019AA /* LaunchdService in Frameworks */,
@@ -57,12 +62,11 @@
 				A1B2C3D4E5F6000100001FAA /* LogViewer in Frameworks */,
 				A1B2C3D4E5F60001000021AA /* PlistEditor in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A1B2C3D4E5F60001000040AA /* mainGroup */ = {
+		A1B2C3D4E5F60001000040AA = {
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60001000041AA /* Houston */,
@@ -82,14 +86,6 @@
 				A1B2C3D4E5F60001000045AA /* Resources */,
 			);
 			path = Houston;
-			sourceTree = "<group>";
-		};
-		A1B2C3D4E5F60001000045AA /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3D4E5F60001000027AA /* DockIcon.png */,
-			);
-			path = Resources;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F60001000042AA /* Products */ = {
@@ -112,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60001000006AA /* ContentView.swift */,
+				A1B2C3D4E5F6000100002BAA /* DesignTokens.swift */,
 				A1B2C3D4E5F60001000008AA /* DetailView.swift */,
 				A1B2C3D4E5F6000100000AAA /* InspectorView.swift */,
 				A1B2C3D4E5F6000100000CAA /* JobListView.swift */,
@@ -119,8 +116,18 @@
 				A1B2C3D4E5F60001000010AA /* LogViewerView.swift */,
 				A1B2C3D4E5F60001000012AA /* MenuBarWidget.swift */,
 				A1B2C3D4E5F60001000014AA /* SidebarView.swift */,
+				A1B2C3D4E5F60001000029AA /* ToastView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60001000045AA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60001000027AA /* DockIcon.png */,
+				A1B2C3D4E5F6000100002DAA /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -135,8 +142,6 @@
 				A1B2C3D4E5F60001000032AA /* Resources */,
 			);
 			buildRules = (
-			);
-			dependencies = (
 			);
 			name = Houston;
 			packageProductDependencies = (
@@ -159,20 +164,20 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2630;
 			};
 			buildConfigurationList = A1B2C3D4E5F60001000080AA /* Build configuration list for PBXProject "Houston" */;
-			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = A1B2C3D4E5F60001000040AA /* mainGroup */;
+			mainGroup = A1B2C3D4E5F60001000040AA;
 			packageReferences = (
 				A1B2C3D4E5F60001000090AA /* XCLocalSwiftPackageReference "HoustonKit" */,
 			);
+			preferredProjectObjectVersion = 90;
 			productRefGroup = A1B2C3D4E5F60001000042AA /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -185,19 +190,17 @@
 /* Begin PBXResourcesBuildPhase section */
 		A1B2C3D4E5F60001000032AA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F60001000015AA /* Assets.xcassets in Resources */,
 				A1B2C3D4E5F60001000026AA /* DockIcon.png in Resources */,
+				A1B2C3D4E5F6000100002CAA /* PrivacyInfo.xcprivacy in Resources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A1B2C3D4E5F60001000031AA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F60001000001AA /* HoustonApp.swift in Sources */,
 				A1B2C3D4E5F60001000003AA /* AppStore.swift in Sources */,
@@ -209,13 +212,14 @@
 				A1B2C3D4E5F6000100000FAA /* LogViewerView.swift in Sources */,
 				A1B2C3D4E5F60001000011AA /* MenuBarWidget.swift in Sources */,
 				A1B2C3D4E5F60001000013AA /* SidebarView.swift in Sources */,
+				A1B2C3D4E5F60001000028AA /* ToastView.swift in Sources */,
+				A1B2C3D4E5F6000100002AAA /* DesignTokens.swift in Sources */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		A1B2C3D4E5F600010000A1AA /* Debug */ = {
+		A1B2C3D4E5F600010000A1AA /* Debug configuration for PBXProject "Houston" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -248,7 +252,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 98C3ZR73ZM;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -266,17 +272,18 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
 		};
-		A1B2C3D4E5F600010000A2AA /* Release */ = {
+		A1B2C3D4E5F600010000A2AA /* Release configuration for PBXProject "Houston" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -309,7 +316,9 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 98C3ZR73ZM;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -321,15 +330,16 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
 			name = Release;
 		};
-		A1B2C3D4E5F600010000B1AA /* Debug */ = {
+		A1B2C3D4E5F600010000B1AA /* Debug configuration for PBXNativeTarget "Houston" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -338,26 +348,30 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Houston;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Quantizor Ventures";
-				INFOPLIST_KEY_NSMainStoryboardFile = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.houston.app";
+				PRODUCT_BUNDLE_IDENTIFIER = com.houston.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL_APP_INTENTS_METADATA = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
-		A1B2C3D4E5F600010000B2AA /* Release */ = {
+		A1B2C3D4E5F600010000B2AA /* Release configuration for PBXNativeTarget "Houston" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -366,19 +380,23 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Houston;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 Quantizor Ventures";
-				INFOPLIST_KEY_NSMainStoryboardFile = "";
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.houston.app";
+				PRODUCT_BUNDLE_IDENTIFIER = com.houston.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL_APP_INTENTS_METADATA = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6.0;
@@ -391,19 +409,17 @@
 		A1B2C3D4E5F60001000070AA /* Build configuration list for PBXNativeTarget "Houston" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1B2C3D4E5F600010000B1AA /* Debug */,
-				A1B2C3D4E5F600010000B2AA /* Release */,
+				A1B2C3D4E5F600010000B1AA /* Debug configuration for PBXNativeTarget "Houston" */,
+				A1B2C3D4E5F600010000B2AA /* Release configuration for PBXNativeTarget "Houston" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		A1B2C3D4E5F60001000080AA /* Build configuration list for PBXProject "Houston" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A1B2C3D4E5F600010000A1AA /* Debug */,
-				A1B2C3D4E5F600010000A2AA /* Release */,
+				A1B2C3D4E5F600010000A1AA /* Debug configuration for PBXProject "Houston" */,
+				A1B2C3D4E5F600010000A2AA /* Release configuration for PBXProject "Houston" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

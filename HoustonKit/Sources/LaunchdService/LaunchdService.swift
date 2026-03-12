@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import Security
+import CAuthHelper
 import Models
 import PrivilegedHelper
 
@@ -136,53 +138,78 @@ public final class LaunchdService {
     }
 
     /// Run one or more shell commands with a single admin authentication prompt.
-    /// Uses Security.framework AuthorizationServices which supports Touch ID on macOS Sonoma+.
+    /// Uses Security.framework AuthorizationCreate for the native macOS auth dialog,
+    /// which supports Touch ID on Apple Silicon Macs.
     @discardableResult
     private nonisolated func runPrivilegedShellCommands(_ commands: [String]) async throws -> String {
-        // Combine all commands into a single shell invocation
         let combined = commands.joined(separator: " ; ")
 
-        // Use osascript with `with administrator privileges` — on macOS 14+ Apple Silicon,
-        // the system auth dialog supports Touch ID when biometrics are enrolled.
-        let script = "do shell script \"\(combined)\" with administrator privileges"
-
         return try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            process.arguments = ["-e", script]
+            // Create an authorization reference requesting the right to execute
+            var authRef: AuthorizationRef?
+            var item = kAuthorizationRightExecute.withCString { name in
+                AuthorizationItem(
+                    name: name,
+                    valueLength: 0,
+                    value: nil,
+                    flags: 0
+                )
+            }
+            var rights = withUnsafeMutablePointer(to: &item) { ptr in
+                AuthorizationRights(count: 1, items: ptr)
+            }
+            let flags: AuthorizationFlags = [.interactionAllowed, .preAuthorize, .extendRights]
 
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
+            let status = AuthorizationCreate(&rights, nil, flags, &authRef)
 
-            process.terminationHandler = { _ in
-                let outData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                let errData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-                if process.terminationStatus != 0 {
-                    var errStr = String(data: errData, encoding: .utf8) ?? "Unknown error"
-                    // Strip osascript noise like "0:150: execution error: "
-                    if let range = errStr.range(of: "execution error: ") {
-                        errStr = String(errStr[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    }
-                    // Strip trailing error number like " (5)"
-                    if let parenRange = errStr.range(of: #" \(\-?\d+\)$"#, options: .regularExpression) {
-                        errStr = String(errStr[..<parenRange.lowerBound])
-                    }
+            guard status == errAuthorizationSuccess, let ref = authRef else {
+                if status == errAuthorizationCanceled {
                     continuation.resume(throwing: LaunchctlError.commandFailed(
-                        exitCode: process.terminationStatus, stderr: errStr
+                        exitCode: -1, stderr: "Authorization canceled"
                     ))
                 } else {
-                    continuation.resume(returning: String(data: outData, encoding: .utf8) ?? "")
+                    continuation.resume(throwing: LaunchctlError.commandFailed(
+                        exitCode: Int32(status), stderr: "Authorization failed (OSStatus \(status))"
+                    ))
                 }
+                return
             }
 
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
+            defer { AuthorizationFree(ref, []) }
+
+            // Execute via /bin/sh -c with the authorized ref
+            let tool = "/bin/sh"
+
+            // Run via our C helper which calls AuthorizationExecuteWithPrivileges
+            // through dlsym. The native auth dialog supports Touch ID on Apple Silicon.
+            var outputPipe: UnsafeMutablePointer<FILE>?
+            let execStatus = AuthorizationExecuteCommand(
+                ref, tool, "-c", combined, &outputPipe
+            )
+
+            guard execStatus == errAuthorizationSuccess else {
+                if execStatus == errAuthorizationCanceled {
+                    continuation.resume(throwing: LaunchctlError.commandFailed(
+                        exitCode: -1, stderr: "Authorization canceled"
+                    ))
+                } else {
+                    continuation.resume(throwing: LaunchctlError.commandFailed(
+                        exitCode: Int32(execStatus), stderr: "Privileged execution failed (OSStatus \(execStatus))"
+                    ))
+                }
+                return
             }
+
+            // Read output from the pipe
+            var output = ""
+            if let pipe = outputPipe {
+                let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: true)
+                let data = fileHandle.readDataToEndOfFile()
+                output = String(data: data, encoding: .utf8) ?? ""
+                fclose(pipe)
+            }
+
+            continuation.resume(returning: output)
         }
     }
 
@@ -207,6 +234,21 @@ public final class LaunchdService {
             let cmd = "rm \(shellEscape([path]))"
             try await runPrivilegedShellCommands([cmd])
         }
+    }
+
+    // MARK: - Service Info
+
+    /// Fetch detailed runtime info for a specific job from launchctl print.
+    public func fetchServiceInfo(for job: LaunchdJob) async -> ServiceInfo {
+        let serviceTarget = "\(job.domain.launchctlDomain)/\(job.label)"
+        var info = await executor.serviceInfo(serviceTarget: serviceTarget)
+
+        // Get process start time if running
+        if case .running(let pid) = job.status {
+            info.processStartTime = await executor.processStartTime(pid: pid)
+        }
+
+        return info
     }
 
     // MARK: - CRUD

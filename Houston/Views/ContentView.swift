@@ -16,7 +16,6 @@ struct ContentView: View {
         } detail: {
             DetailView()
         }
-        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -43,18 +42,16 @@ struct ContentView: View {
         .task {
             await store.refreshJobs()
         }
-        .alert("Error", isPresented: Binding(
-            get: { store.errorMessage != nil },
-            set: { if !$0 { store.errorMessage = nil } }
-        )) {
-            Button("OK") { store.errorMessage = nil }
-        } message: {
-            Text(store.errorMessage ?? "")
+        .onChange(of: store.isLoading) { _, isLoading in
+            if !isLoading {
+                AccessibilityNotification.Announcement("Jobs loaded").post()
+            }
         }
+        .toast(store.currentToast)
     }
 }
 
 #Preview {
     ContentView()
         .environment(AppStore())
-}
+} 

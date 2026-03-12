@@ -25,6 +25,7 @@ public final class JobAnalyzer: @unchecked Sendable {
             LabelRule(),
             CalendarIntervalRule(),
             OutputPathRule(),
+            CleanupRule(),
         ]
     }
 

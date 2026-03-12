@@ -1,6 +1,7 @@
 import SwiftUI
 import Models
 import PlistEditor
+import LogViewer
 
 enum DetailTab: String, CaseIterable {
     case standard = "Standard"
@@ -19,26 +20,35 @@ enum DetailTab: String, CaseIterable {
 struct DetailView: View {
     @Environment(AppStore.self) private var store
     @State private var selectedTab: DetailTab = .standard
-    @State private var showInspector: Bool = false
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                // Tab bar
-                Picker("View", selection: $selectedTab) {
-                    ForEach(DetailTab.allCases, id: \.self) { tab in
-                        Label(tab.rawValue, systemImage: tab.systemImage)
-                            .tag(tab)
+            if let job = store.selectedJob {
+                VStack(spacing: 0) {
+                    // Status header
+                    JobStatusHeader(job: job)
+
+                    Divider()
+
+                    // Log preview
+                    LogPreview(job: job)
+
+                    Divider()
+
+                    // Tab bar
+                    Picker("View", selection: $selectedTab) {
+                        ForEach(DetailTab.allCases, id: \.self) { tab in
+                            Label(tab.rawValue, systemImage: tab.systemImage)
+                                .tag(tab)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
 
-                Divider()
+                    Divider()
 
-                // Tab content
-                if let job = store.selectedJob {
+                    // Tab content
                     switch selectedTab {
                     case .standard:
                         StandardTabView(job: job)
@@ -49,7 +59,6 @@ struct DetailView: View {
                     }
                 }
             }
-            .opacity(store.selectedJob != nil ? 1 : 0)
 
             // Overlay messages when no single selection
             if store.selectedJobIDs.count > 1 {
@@ -68,24 +77,363 @@ struct DetailView: View {
                 .background(.background)
             }
         }
-        .inspector(isPresented: $showInspector) {
-            if let job = store.selectedJob {
-                InspectorView(job: job)
-            }
-        }
         .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button {
-                    withAnimation { showInspector.toggle() }
-                } label: {
-                    Label("Inspector", systemImage: "sidebar.trailing")
+            if let job = store.selectedJob {
+                ToolbarItemGroup(placement: .automatic) {
+                    quickActionButtons(for: job)
                 }
-                .help("Toggle inspector panel")
             }
         }
-        .onChange(of: store.selectedJob?.id) { _, newValue in
-            showInspector = newValue != nil
+    }
+
+    @ViewBuilder
+    private func quickActionButtons(for job: LaunchdJob) -> some View {
+        if job.status.isRunning {
+            Button {
+                Task { await store.unloadJob(job) }
+            } label: {
+                Label("Stop", systemImage: "stop.fill")
+            }
+            .help("Stop this job")
+
+            Button(role: .destructive) {
+                Task { await store.forceKillJob(job) }
+            } label: {
+                Label("Force Kill", systemImage: "xmark.octagon")
+            }
+            .help("Force kill (SIGKILL)")
+        } else {
+            Button {
+                Task { await store.startJob(job) }
+            } label: {
+                Label("Start", systemImage: "play.fill")
+            }
+            .help("Start this job")
         }
+
+        if job.isEnabled {
+            Button {
+                Task { await store.disableJob(job) }
+            } label: {
+                Label("Disable", systemImage: "pause.circle")
+            }
+            .help("Disable this job")
+        } else {
+            Button {
+                Task { await store.enableJob(job) }
+            } label: {
+                Label("Enable", systemImage: "play.circle")
+            }
+            .help("Enable this job")
+        }
+
+        if job.status.isLoaded {
+            Button {
+                Task { await store.unloadJob(job) }
+            } label: {
+                Label("Unload", systemImage: "eject")
+            }
+            .help("Unload this job")
+        } else {
+            Button {
+                Task { await store.loadJob(job) }
+            } label: {
+                Label("Load", systemImage: "square.and.arrow.down")
+            }
+            .help("Load this job")
+        }
+
+        Button {
+            store.selectedJobIDs = [job.id]
+            store.showingDeleteConfirmation = true
+        } label: {
+            Label("Delete", systemImage: "trash")
+                .foregroundStyle(.red)
+        }
+        .help("Delete this job")
+    }
+}
+
+// MARK: - Job Status Header
+
+struct JobStatusHeader: View {
+    let job: LaunchdJob
+    @Environment(AppStore.self) private var store
+
+    private var info: ServiceInfo? { store.currentServiceInfo }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Primary status row
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: job.status.symbol)
+                        .foregroundStyle(job.status.color)
+                        .font(.caption2)
+                    Text(job.status.label)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(job.status.color)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Status: \(job.status.label)")
+
+                if case .running(let pid) = job.status {
+                    Text("PID \(pid, format: .number.grouping(.never))")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                if case .loaded(let exitCode) = job.status, let exitCode {
+                    Text("Exit \(exitCode)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
+                }
+
+                if case .error(let message) = job.status {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                }
+
+                if !job.isEnabled {
+                    StatusPill(label: "Disabled", color: .red)
+                }
+
+                Spacer()
+            }
+
+            // Analysis issues
+            if !store.currentAnalysisResults.isEmpty {
+                ForEach(store.currentAnalysisResults) { result in
+                    HStack(spacing: 6) {
+                        Image(systemName: result.severity.icon)
+                            .foregroundStyle(result.severity.color)
+                            .font(.caption2)
+                        Text(result.title)
+                            .font(.caption)
+                        if let key = result.key {
+                            Text(key)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                        if let suggestion = result.suggestion {
+                            Text(suggestion)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // Runtime details row
+            HStack(spacing: 16) {
+                statusDetail(label: "Runs", value: info?.runs.map { "\($0)" } ?? "–")
+
+                if case .running = job.status {
+                    statusDetail(label: "Up", value: info?.processStartTime.map { uptimeString(since: $0) } ?? "–")
+                }
+
+                statusDetail(label: "Last Exit", value: info?.lastExitReason ?? "–")
+                statusDetail(label: "Spawn", value: info?.spawnType ?? "–")
+
+                let syslogCount = store.logReader.entries.filter { $0.source == .systemLog }.count
+                let errorCount = store.logReader.entries.filter { $0.level == .error || $0.level == .fault }.count
+                statusDetail(label: "Logs", value: syslogCount > 0
+                    ? (errorCount > 0 ? "\(syslogCount) (\(errorCount) errors)" : "\(syslogCount)")
+                    : "–")
+
+                Spacer()
+            }
+            .padding(.top, 4)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.quaternary.opacity(0.3))
+    }
+
+    private func statusDetail(label: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+    }
+
+    private func hasRuntimeDetails(_ info: ServiceInfo) -> Bool {
+        info.runs != nil || info.processStartTime != nil || info.lastExitReason != nil || info.spawnType != nil
+    }
+
+    private func uptimeString(since date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return "\(Int(interval))s" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 {
+            let h = Int(interval / 3600)
+            let m = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+            return "\(h)h \(m)m"
+        }
+        let d = Int(interval / 86400)
+        let h = Int((interval.truncatingRemainder(dividingBy: 86400)) / 3600)
+        return "\(d)d \(h)h"
+    }
+
+}
+
+// MARK: - Log Preview
+
+struct LogPreview: View {
+    let job: LaunchdJob
+    @Environment(AppStore.self) private var store
+    @State private var isExpanded: Bool = false
+    @State private var hasAutoExpanded: Bool = false
+    @State private var refreshTimer: Timer?
+
+    private let maxEntries = 20
+
+    private var recentEntries: [LogEntry] {
+        Array(store.logReader.entries.suffix(maxEntries))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header bar
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+
+                    Image(systemName: "terminal")
+                        .font(.caption)
+
+                    Text("Logs")
+                        .font(.caption.weight(.medium))
+
+                    if !store.logReader.entries.isEmpty {
+                        Text("\(store.logReader.entries.count)")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    if job.status.isRunning {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 5, height: 5)
+                    }
+
+                    Spacer()
+
+                    if isExpanded && !recentEntries.isEmpty {
+                        Button {
+                            copyLogs()
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy visible logs")
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                if recentEntries.isEmpty {
+                    Text("No log entries found")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(.quaternary.opacity(0.3))
+                } else {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(recentEntries) { entry in
+                                    logLine(entry)
+                                        .id(entry.id)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                        }
+                        .frame(maxHeight: 140)
+                        .onChange(of: store.logReader.entries.count) {
+                            if let last = recentEntries.last {
+                                withAnimation(.easeOut(duration: 0.1)) {
+                                    proxy.scrollTo(last.id, anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                    .background(.quaternary.opacity(0.3))
+                    .textSelection(.enabled)
+                }
+            }
+        }
+        .onAppear { startAutoRefresh() }
+        .onDisappear { stopAutoRefresh() }
+        .onChange(of: store.logReader.entries.isEmpty) { _, isEmpty in
+            if !isEmpty && !hasAutoExpanded {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
+                hasAutoExpanded = true
+            }
+        }
+        .onChange(of: job.id) {
+            hasAutoExpanded = false
+            isExpanded = !store.logReader.entries.isEmpty
+        }
+    }
+
+    private func logLine(_ entry: LogEntry) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let ts = entry.timestamp {
+                Text(ts, format: .dateTime.hour().minute().second())
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 60, alignment: .leading)
+            }
+
+            Text(entry.message)
+                .font(.caption.monospaced())
+                .foregroundStyle(entry.level.color)
+                .lineLimit(2)
+        }
+        .padding(.vertical, 1)
+    }
+
+    private func copyLogs() {
+        let text = recentEntries.map { entry in
+            let ts = entry.timestamp.map { ISO8601DateFormatter().string(from: $0) } ?? ""
+            return "\(ts) [\(entry.level.rawValue)] \(entry.message)"
+        }.joined(separator: "\n")
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        store.showToast(.info, "Logs copied")
+    }
+
+    private func startAutoRefresh() {
+        guard job.status.isRunning else { return }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            Task { @MainActor in
+                await store.logReader.refresh()
+            }
+        }
+    }
+
+    private func stopAutoRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 }
 
@@ -108,13 +456,15 @@ struct StandardTabView: View {
 
                 LabeledContent("Domain") {
                     Text(job.domain.displayName)
+                        .font(.body)
                 }
 
                 LabeledContent("Plist Path") {
                     Text(job.plistURL.path)
-                        .font(.caption.monospaced())
+                        .font(.body.monospaced())
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
+                        .truncationMode(.middle)
                 }
             }
 
@@ -161,8 +511,8 @@ struct StandardTabView: View {
                 Section("Validation Issues") {
                     ForEach(editorVM.validationErrors) { error in
                         HStack(alignment: .top, spacing: 6) {
-                            Image(systemName: error.severity == .error ? "xmark.circle.fill" : "exclamationmark.triangle.fill")
-                                .foregroundStyle(error.severity == .error ? .red : .yellow)
+                            Image(systemName: error.severity.icon)
+                                .foregroundStyle(error.severity.color)
                                 .font(.caption)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(error.key)
@@ -199,9 +549,8 @@ struct ExpertTabView: View {
                         Section {
                             ForEach(validationErrors) { error in
                                 HStack(alignment: .top, spacing: 6) {
-                                    Image(systemName: error.severity == .error
-                                          ? "xmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundStyle(error.severity == .error ? .red : .yellow)
+                                    Image(systemName: error.severity.icon)
+                                        .foregroundStyle(error.severity.color)
                                         .font(.caption)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(error.key)
@@ -272,16 +621,11 @@ struct PlistNodeRow: View {
                 .font(.body.monospaced().weight(.medium))
                 .textSelection(.enabled)
 
-            Text(node.value.typeDescription)
-                .font(.caption2.monospaced())
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                .foregroundStyle(.blue)
+            TagBadge(label: node.value.typeDescription, color: .blue)
 
             switch node.value {
             case .boolean(let b):
-                Toggle("", isOn: Binding(
+                Toggle(node.key, isOn: Binding(
                     get: { b },
                     set: { node.value = .boolean($0); editor.hasUnsavedChanges = true }
                 ))
@@ -418,7 +762,7 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
         let scrollView = NSTextView.scrollableTextView()
         let textView = scrollView.documentView as! NSTextView
 
-        textView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
@@ -428,6 +772,7 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
         textView.usesFindBar = true
         textView.textContainerInset = NSSize(width: 8, height: 8)
         textView.delegate = context.coordinator
+        textView.setAccessibilityLabel("XML plist editor")
 
         context.coordinator.textView = textView
         textView.string = text
@@ -474,7 +819,7 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
             // Base style
             storage.beginEditing()
             storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
-            storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular), range: fullRange)
+            storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular), range: fullRange)
 
             let colors = XMLSyntaxColors(isDark: isDark)
 

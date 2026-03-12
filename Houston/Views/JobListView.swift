@@ -63,6 +63,7 @@ struct JobListView: View {
                                     .font(.caption)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
                         }
                     }
                     .padding(.horizontal, 10)
@@ -195,6 +196,7 @@ struct JobListView: View {
                     Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString("\(pid)", forType: .string)
+                        store.showToast(.info, "PID copied")
                     } label: {
                         Label("Copy PID (\(pid))", systemImage: "doc.on.doc")
                     }
@@ -203,6 +205,7 @@ struct JobListView: View {
                 Button {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(job.label, forType: .string)
+                    store.showToast(.info, "Label copied")
                 } label: {
                     Label("Copy Label", systemImage: "doc.on.doc")
                 }
@@ -238,9 +241,9 @@ struct JobRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: statusSymbol)
-                .foregroundStyle(statusColor)
-                .font(.system(size: 10))
+            Image(systemName: job.status.symbol)
+                .foregroundStyle(job.status.color)
+                .font(.caption2)
                 .frame(width: 16)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -249,9 +252,9 @@ struct JobRow: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text(statusLabel)
+                    Text(job.status.label)
                         .font(.caption)
-                        .foregroundStyle(statusColor)
+                        .foregroundStyle(job.status.color)
 
                     if case .running(let pid) = job.status {
                         Text("PID \(pid, format: .number.grouping(.never))")
@@ -260,12 +263,7 @@ struct JobRow: View {
                     }
 
                     if !job.isEnabled {
-                        Text("Disabled")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.red.opacity(0.15), in: Capsule())
-                            .foregroundStyle(.red)
+                        StatusPill(label: "Disabled", color: .red)
                     }
                 }
             }
@@ -278,33 +276,19 @@ struct JobRow: View {
                 .lineLimit(1)
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
     }
 
-    private var statusColor: Color {
-        switch job.status {
-        case .running: return .green
-        case .loaded: return .yellow
-        case .unloaded: return .gray
-        case .error: return .red
+    private var accessibilityDescription: String {
+        var parts: [String] = [job.displayName, job.status.label]
+        if case .running(let pid) = job.status {
+            parts.append("PID \(pid)")
         }
-    }
-
-    private var statusSymbol: String {
-        switch job.status {
-        case .running: return "circle.fill"
-        case .loaded: return "circle.lefthalf.filled"
-        case .unloaded: return "circle"
-        case .error: return "exclamationmark.circle.fill"
+        if !job.isEnabled {
+            parts.append("Disabled")
         }
-    }
-
-    private var statusLabel: String {
-        switch job.status {
-        case .running: return "Running"
-        case .loaded: return "Loaded"
-        case .unloaded: return "Not Loaded"
-        case .error: return "Error"
-        }
+        return parts.joined(separator: ", ")
     }
 }
 

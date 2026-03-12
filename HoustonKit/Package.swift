@@ -23,8 +23,13 @@ let package = Package(
             dependencies: []
         ),
         .target(
+            name: "CAuthHelper",
+            dependencies: [],
+            linkerSettings: [.linkedFramework("Security")]
+        ),
+        .target(
             name: "LaunchdService",
-            dependencies: ["Models", "PrivilegedHelper"]
+            dependencies: ["Models", "PrivilegedHelper", "CAuthHelper"]
         ),
         .target(
             name: "PrivilegedHelper",
@@ -40,7 +45,7 @@ let package = Package(
         ),
         .target(
             name: "PlistEditor",
-            dependencies: ["Models", "LaunchdService"]
+            dependencies: ["Models"]
         ),
 
         // MARK: - Tests

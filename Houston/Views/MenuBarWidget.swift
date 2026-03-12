@@ -19,7 +19,7 @@ struct MenuBarWidget: View {
                             HStack {
                                 Image(systemName: "circle.fill")
                                     .foregroundStyle(.green)
-                                    .font(.system(size: 8))
+                                    .font(.caption2)
                                     .frame(width: 16)
 
                                 Text(job.label)
@@ -35,6 +35,7 @@ struct MenuBarWidget: View {
                                 }
                             }
                         }
+                        .accessibilityHint("Double-click to stop this job")
                     }
                 }
 

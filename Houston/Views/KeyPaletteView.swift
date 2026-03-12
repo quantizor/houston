@@ -79,12 +79,7 @@ struct KeyRow: View {
                         .font(.body.monospaced().weight(.medium))
 
                     if keyInfo.required {
-                        Text("Required")
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                            .foregroundStyle(.red)
+                        StatusPill(label: "Required", color: .red)
                     }
                 }
 
@@ -96,13 +91,9 @@ struct KeyRow: View {
 
             Spacer()
 
-            Text(keyInfo.type.rawValue)
-                .font(.caption2.monospaced())
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                .foregroundStyle(.blue)
+            TagBadge(label: keyInfo.type.rawValue, color: .blue)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -120,27 +111,11 @@ struct KeyDetailPane: View {
                         .font(.title2.monospaced().weight(.bold))
 
                     HStack(spacing: 8) {
-                        Text(keyInfo.type.rawValue)
-                            .font(.caption.monospaced())
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                            .foregroundStyle(.blue)
-
-                        Text(keyInfo.category.rawValue.capitalized)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                            .foregroundStyle(.secondary)
+                        TagBadge(label: keyInfo.type.rawValue, color: .blue)
+                        TagBadge(label: keyInfo.category.rawValue.capitalized, color: .secondary)
 
                         if keyInfo.required {
-                            Text("Required")
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
-                                .foregroundStyle(.red)
+                            StatusPill(label: "Required", color: .red)
                         }
                     }
                 }

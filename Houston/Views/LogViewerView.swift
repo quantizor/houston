@@ -33,6 +33,7 @@ struct LogViewerView: View {
                 }
                 .toggleStyle(.button)
                 .help("Auto-scroll to bottom")
+                .accessibilityLabel("Auto-scroll to bottom")
 
                 Button {
                     logReader.clear()
@@ -40,6 +41,7 @@ struct LogViewerView: View {
                     Image(systemName: "trash")
                 }
                 .help("Clear log output")
+                .accessibilityLabel("Clear log output")
 
                 Button {
                     Task { await logReader.refresh() }
@@ -47,6 +49,7 @@ struct LogViewerView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh logs")
+                .accessibilityLabel("Refresh logs")
             }
             .padding(.horizontal)
             .padding(.vertical, 6)
@@ -62,7 +65,7 @@ struct LogViewerView: View {
                 ScrollView {
                     if entries.isEmpty {
                         Text("No log output available.")
-                            .font(.system(.caption, design: .monospaced))
+                            .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(8)
@@ -98,29 +101,19 @@ struct LogEntryRow: View {
         HStack(alignment: .top, spacing: 8) {
             if let timestamp = entry.timestamp {
                 Text(timestamp, format: .dateTime.hour().minute().second().secondFraction(.fractional(3)))
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(.caption2.monospaced())
                     .foregroundStyle(.tertiary)
                     .frame(width: 90, alignment: .leading)
             }
 
             Text(entry.message)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(levelColor)
+                .font(.caption.monospaced())
+                .foregroundStyle(entry.level.color)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var levelColor: Color {
-        switch entry.level {
-        case .debug: return .secondary
-        case .info: return .primary
-        case .notice: return .blue
-        case .warning: return .yellow
-        case .error: return .red
-        case .fault: return .red
-        }
-    }
 }
 
 #Preview {

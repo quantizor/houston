@@ -59,6 +59,7 @@ struct SidebarView: View {
                 }
             }
         }
+        .listStyle(.sidebar)
         .navigationTitle("Houston")
     }
 

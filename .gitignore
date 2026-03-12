@@ -41,6 +41,9 @@ playground.xcworkspace
 # Code injection (InjectionIII)
 .injection/
 
+# Claude Code
+.claude/
+
 # Environment / secrets
 .env
 .env.*

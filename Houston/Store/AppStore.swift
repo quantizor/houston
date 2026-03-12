@@ -18,14 +18,18 @@ final class AppStore {
     var selectedJobIDs: Set<String> = []
     var showingDeleteConfirmation: Bool = false
     var searchText: String = ""
-    var errorMessage: String? = nil
     var showingKeyPalette: Bool = false
+
+    // Toast feedback
+    var currentToast: Toast? = nil
+    private var toastDismissTask: Task<Void, Never>?
 
     // Editor state
     var editorViewModel = PlistEditorViewModel()
 
-    // Analysis results for the currently selected job
+    // Analysis results and runtime info for the currently selected job
     var currentAnalysisResults: [AnalysisResult] = []
+    var currentServiceInfo: ServiceInfo?
 
     enum JobFilter: String, CaseIterable, Identifiable {
         case all = "All Jobs"
@@ -112,67 +116,95 @@ final class AppStore {
         }
     }
 
+    // MARK: - Toast
+
+    func showToast(_ style: Toast.Style, _ message: String) {
+        toastDismissTask?.cancel()
+        currentToast = Toast(style: style, message: message)
+        toastDismissTask = Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if !Task.isCancelled {
+                currentToast = nil
+            }
+        }
+    }
+
     // MARK: - Actions
 
     func refreshJobs() async {
         do {
             try await launchdService.loadAllJobs()
         } catch {
-            errorMessage = "Failed to load jobs: \(error.localizedDescription)"
+            showToast(.error, "Failed to load jobs: \(error.localizedDescription)")
         }
     }
 
     func loadJob(_ job: LaunchdJob) async {
         do {
             try await launchdService.loadJob(job)
+            showToast(.success, "\(job.displayName) loaded")
         } catch {
-            errorMessage = "Failed to load job: \(error.localizedDescription)"
+            showToast(.error, "Failed to load job: \(error.localizedDescription)")
         }
     }
 
     func unloadJob(_ job: LaunchdJob) async {
         do {
             try await launchdService.unloadJob(job)
+            showToast(.success, "\(job.displayName) unloaded")
         } catch {
-            errorMessage = "Failed to unload job: \(error.localizedDescription)"
+            showToast(.error, "Failed to unload job: \(error.localizedDescription)")
         }
     }
 
     func enableJob(_ job: LaunchdJob) async {
         do {
             try await launchdService.enableJob(job)
+            showToast(.success, "\(job.displayName) enabled")
         } catch {
-            errorMessage = "Failed to enable job: \(error.localizedDescription)"
+            showToast(.error, "Failed to enable job: \(error.localizedDescription)")
         }
     }
 
     func disableJob(_ job: LaunchdJob) async {
         do {
             try await launchdService.disableJob(job)
+            showToast(.success, "\(job.displayName) disabled")
         } catch {
-            errorMessage = "Failed to disable job: \(error.localizedDescription)"
+            showToast(.error, "Failed to disable job: \(error.localizedDescription)")
         }
     }
 
     func startJob(_ job: LaunchdJob) async {
         do {
             try await launchdService.startJob(job)
+            showToast(.success, "\(job.displayName) started")
         } catch {
-            errorMessage = "Failed to start job: \(error.localizedDescription)"
+            showToast(.error, "Failed to start job: \(error.localizedDescription)")
         }
     }
 
     func forceKillJob(_ job: LaunchdJob) async {
         guard case .running(let pid) = job.status else { return }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/kill")
-        process.arguments = ["-9", "\(pid)"]
         do {
-            try process.run()
-            process.waitUntilExit()
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/kill")
+                process.arguments = ["-9", "\(pid)"]
+                process.terminationHandler = { _ in
+                    continuation.resume()
+                }
+                do {
+                    try process.run()
+                } catch {
+                    process.terminationHandler = nil
+                    continuation.resume(throwing: error)
+                }
+            }
             try await launchdService.refreshStatus()
+            showToast(.success, "Process \(pid) killed")
         } catch {
-            errorMessage = "Failed to kill process \(pid): \(error.localizedDescription)"
+            showToast(.error, "Failed to kill process \(pid): \(error.localizedDescription)")
         }
     }
 
@@ -180,20 +212,23 @@ final class AppStore {
         do {
             try await launchdService.deleteJob(job)
             selectedJobIDs.remove(job.id)
+            showToast(.success, "\(job.displayName) deleted")
         } catch {
-            errorMessage = "Failed to delete job: \(error.localizedDescription)"
+            showToast(.error, "Failed to delete job: \(error.localizedDescription)")
         }
     }
 
     func deleteSelectedJobs() async {
         let toDelete = selectedJobs
+        let count = toDelete.count
         do {
             try await launchdService.deleteJobs(toDelete)
             for job in toDelete {
                 selectedJobIDs.remove(job.id)
             }
+            showToast(.success, "\(count) job\(count == 1 ? "" : "s") deleted")
         } catch {
-            errorMessage = "Failed to delete jobs: \(error.localizedDescription)"
+            showToast(.error, "Failed to delete jobs: \(error.localizedDescription)")
         }
     }
 
@@ -204,6 +239,7 @@ final class AppStore {
 
         // Cancel any in-flight selection load
         selectJobTask?.cancel()
+        currentServiceInfo = nil
 
         selectJobTask = Task {
             // Read file data off main thread
@@ -221,7 +257,16 @@ final class AppStore {
             }
 
             guard !Task.isCancelled else { return }
-            await logReader.loadLogs(for: job)
+
+            // Fetch runtime info and logs concurrently
+            async let serviceInfo = launchdService.fetchServiceInfo(for: job)
+            async let logs: Void = logReader.loadLogs(for: job)
+
+            let info = await serviceInfo
+            _ = await logs
+
+            guard !Task.isCancelled else { return }
+            currentServiceInfo = info
         }
     }
 
@@ -229,8 +274,9 @@ final class AppStore {
         guard let job = selectedJob else { return }
         do {
             try await launchdService.saveJob(job)
+            showToast(.success, "Changes saved")
         } catch {
-            errorMessage = "Failed to save job: \(error.localizedDescription)"
+            showToast(.error, "Failed to save job: \(error.localizedDescription)")
         }
     }
 }

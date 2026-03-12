@@ -1,50 +1,45 @@
 # Houston
 
-Free, open-source macOS launchd GUI. A democratized alternative to [LaunchControl](https://www.soma-zone.com/LaunchControl/).
+Mission control for macOS launch daemons and agents. Free and open source.
 
-Browse, create, edit, enable/disable, and debug launch agents and daemons through a native SwiftUI interface.
+A native SwiftUI alternative to [LaunchControl](https://www.soma-zone.com/LaunchControl/).
 
-## Features
+## What it does
 
-- 3-column layout: domains/filters, job list, detail editor
-- Browse all launch agents and daemons across user and system domains
-- Create, edit, enable/disable, load/unload jobs
-- Plist editor with syntax highlighting and validation
-- Privilege escalation via XPC helper (Touch ID on Apple Silicon)
-- Real-time directory monitoring for plist changes
+Browse, create, edit, and manage every launchd job on your Mac — user agents, global agents, and system daemons — from one window. Plist editor with validation. Touch ID for privileged operations.
 
 ## Requirements
 
-- macOS 14+ (Sonoma)
-- Swift 6 / Xcode 16+ (for building from source)
+macOS 14 (Sonoma) or later. Xcode 16+ to build from source.
 
-## Build and install
-
-```
-make build              # Build HoustonKit SPM package
-make build-app          # Build the full app via xcodebuild
-make build-app-release  # Release build
-make install            # Build release and copy to /Applications
-make test               # Run all tests
-make open               # Open in Xcode
-make help               # Show all available commands
-```
-
-## Architecture
-
-Single Xcode project with an embedded SPM package (HoustonKit). Six modules:
+## Get started
 
 ```
-Models            -> (none)
-LaunchdService    -> Models
-PrivilegedHelper  -> Models
-JobAnalyzer       -> Models, LaunchdService
-LogViewer         -> Models
-PlistEditor       -> Models, LaunchdService
+make install
 ```
 
-Swift 6, SwiftUI, Swift Package Manager, XPC privileged helper for /Library operations. No external dependencies beyond Apple frameworks.
+Or open in Xcode:
+
+```
+make open
+```
+
+All commands: `make help`
+
+## How it's built
+
+Swift 6, SwiftUI, no external dependencies. One Xcode project with an embedded Swift package:
+
+```
+HoustonKit/
+  Models             Data types
+  LaunchdService     launchctl, plist I/O
+  PrivilegedHelper   XPC client for /Library ops
+  JobAnalyzer        Misconfiguration detection
+  LogViewer          File tail + OSLog
+  PlistEditor        Editor view models
+```
 
 ## License
 
-MIT — Made by [Quantizor Ventures](https://quantizor.dev)
+MIT — [Quantizor Ventures](https://quantizor.dev)
