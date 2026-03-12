@@ -6,6 +6,16 @@ import PrivilegedHelper
 
 private let logger = Logger(subsystem: "com.quantizor.houston", category: "LaunchdService")
 
+public enum LaunchdServiceError: LocalizedError {
+    case deletionFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .deletionFailed(let details): "Failed to delete:\n\(details)"
+        }
+    }
+}
+
 @Observable @MainActor
 public final class LaunchdService {
     public private(set) var jobs: [LaunchdJob] = []
@@ -232,31 +242,41 @@ public final class LaunchdService {
 
     /// Delete multiple jobs in a batch.
     public func deleteJobs(_ jobsToDelete: [LaunchdJob]) async throws {
-        let privilegedJobs = jobsToDelete.filter { $0.domain.requiresPrivilege }
-        let userJobs = jobsToDelete.filter { !$0.domain.requiresPrivilege }
+        var deleted: Set<LaunchdJob.ID> = []
+        var errors: [String] = []
 
-        // Handle user-domain jobs
-        for job in userJobs {
+        for job in jobsToDelete {
+            // Unload first (best-effort, don't block deletion)
             if job.status.isLoaded {
-                try? await executor.bootout(domain: job.domain.launchctlDomain, plistPath: job.plistURL.path)
+                if job.domain.requiresPrivilege {
+                    _ = try? await privilegedHelper.executeLaunchctl(arguments: [
+                        "bootout", job.domain.launchctlDomain, job.plistURL.path
+                    ])
+                } else {
+                    try? await executor.bootout(domain: job.domain.launchctlDomain, plistPath: job.plistURL.path)
+                }
             }
-            try? FileManager.default.removeItem(at: job.plistURL)
+
+            // Delete plist — propagate errors
+            do {
+                if job.domain.requiresPrivilege {
+                    try await privilegedHelper.deletePlist(atPath: job.plistURL.path)
+                } else {
+                    try FileManager.default.removeItem(at: job.plistURL)
+                }
+                deleted.insert(job.id)
+            } catch {
+                errors.append("\(job.displayName): \(error.localizedDescription)")
+            }
         }
 
-        // Handle privileged jobs via XPC helper
-        for job in privilegedJobs {
-            if job.status.isLoaded {
-                _ = try? await privilegedHelper.executeLaunchctl(arguments: [
-                    "bootout", job.domain.launchctlDomain, job.plistURL.path
-                ])
-            }
-            try? await privilegedHelper.deletePlist(atPath: job.plistURL.path)
-        }
-
-        // Remove from local list
-        let deletedIDs = Set(jobsToDelete.map(\.id))
-        jobs.removeAll { deletedIDs.contains($0.id) }
+        // Only remove jobs whose plist was actually deleted
+        jobs.removeAll { deleted.contains($0.id) }
         try await refreshStatus()
+
+        if !errors.isEmpty {
+            throw LaunchdServiceError.deletionFailed(errors.joined(separator: "\n"))
+        }
     }
 
     /// Save a job's promoted fields back to its plist file.
