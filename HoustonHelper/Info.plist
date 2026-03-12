@@ -3,14 +3,14 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.houston.helper</string>
+    <string>com.quantizor.houston.helper</string>
     <key>CFBundleName</key>
     <string>HoustonHelper</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>SMAuthorizedClients</key>
     <array>
-        <string>identifier "com.houston.app"</string>
+        <string>identifier "com.quantizor.houston"</string>
     </array>
 </dict>
 </plist>

@@ -1,16 +1,48 @@
 import SwiftUI
+import os
 import Models
 import LaunchdService
 import JobAnalyzer
 import LogViewer
 import PlistEditor
+import PrivilegedHelper
+
+private let logger = Logger(subsystem: "com.quantizor.houston", category: "AppStore")
 
 @Observable @MainActor
 final class AppStore {
     // Services
-    let launchdService = LaunchdService()
+    let launchdService: LaunchdService
+    private let helperClient: PrivilegedHelperClient
+
+    init() {
+        let helperClient = PrivilegedHelperClient()
+        self.helperClient = helperClient
+        let executor = FallbackLaunchctlExecutor(client: helperClient)
+        launchdService = LaunchdService(executor: executor, privilegedHelper: helperClient)
+        logReader = LogReader(helperClient: helperClient)
+    }
     let jobAnalyzer = JobAnalyzer()
-    let logReader = LogReader()
+    let logReader: LogReader
+
+    /// Ensure the privileged helper is installed (required for sandboxed operation).
+    /// In debug builds without sandbox, the helper is unnecessary — direct Process() works.
+    func ensureHelperInstalled() async {
+        #if !DEBUG
+        let available = await helperClient.isHelperAvailable()
+        logger.info("Helper available: \(available)")
+        guard !available else { return }
+        do {
+            try await helperClient.installHelper()
+            logger.info("Helper installed successfully")
+        } catch {
+            logger.error("Helper install failed: \(error)")
+            showToast(.error, "Failed to install privileged helper: \(error.localizedDescription)")
+        }
+        #else
+        logger.info("Debug build — skipping helper installation (direct Process() available)")
+        #endif
+    }
 
     // State
     var selectedDomain: JobDomainType? = nil
@@ -121,8 +153,9 @@ final class AppStore {
     func showToast(_ style: Toast.Style, _ message: String) {
         toastDismissTask?.cancel()
         currentToast = Toast(style: style, message: message)
+        let duration: Duration = style == .error ? .seconds(6) : .seconds(2.5)
         toastDismissTask = Task {
-            try? await Task.sleep(for: .seconds(2.5))
+            try? await Task.sleep(for: duration)
             if !Task.isCancelled {
                 currentToast = nil
             }
@@ -134,8 +167,15 @@ final class AppStore {
     func refreshJobs() async {
         do {
             try await launchdService.loadAllJobs()
+            logger.info("Loaded \(self.launchdService.jobs.count) jobs")
         } catch {
+            logger.error("Failed to load jobs: \(error)")
             showToast(.error, "Failed to load jobs: \(error.localizedDescription)")
+        }
+
+        // Re-select current job to refresh detail panel
+        if let job = selectedJob {
+            selectJob(job)
         }
     }
 
@@ -187,21 +227,7 @@ final class AppStore {
     func forceKillJob(_ job: LaunchdJob) async {
         guard case .running(let pid) = job.status else { return }
         do {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/kill")
-                process.arguments = ["-9", "\(pid)"]
-                process.terminationHandler = { _ in
-                    continuation.resume()
-                }
-                do {
-                    try process.run()
-                } catch {
-                    process.terminationHandler = nil
-                    continuation.resume(throwing: error)
-                }
-            }
-            try await launchdService.refreshStatus()
+            try await launchdService.killProcess(pid: pid)
             showToast(.success, "Process \(pid) killed")
         } catch {
             showToast(.error, "Failed to kill process \(pid): \(error.localizedDescription)")
@@ -215,6 +241,7 @@ final class AppStore {
             showToast(.success, "\(job.displayName) deleted")
         } catch {
             showToast(.error, "Failed to delete job: \(error.localizedDescription)")
+            await refreshJobs()
         }
     }
 
@@ -229,6 +256,7 @@ final class AppStore {
             showToast(.success, "\(count) job\(count == 1 ? "" : "s") deleted")
         } catch {
             showToast(.error, "Failed to delete jobs: \(error.localizedDescription)")
+            await refreshJobs()
         }
     }
 

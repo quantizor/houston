@@ -12,21 +12,12 @@ struct LogViewerView: View {
         @Bindable var logReader = store.logReader
 
         VStack(spacing: 0) {
-            // Toolbar
             HStack {
-                Picker("Source", selection: $logReader.activeSource) {
-                    ForEach(LogEntry.LogSource.allCases, id: \.self) { source in
-                        Text(sourceDisplayName(source)).tag(source)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 300)
-
-                Spacer()
-
                 TextField("Filter", text: $logReader.filterText)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 200)
+
+                Spacer()
 
                 Toggle(isOn: $autoScroll) {
                     Image(systemName: "arrow.down.to.line")
@@ -56,7 +47,6 @@ struct LogViewerView: View {
 
             Divider()
 
-            // Log content area
             if store.logReader.isReading {
                 ProgressView("Loading logs...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -80,14 +70,6 @@ struct LogViewerView: View {
                 }
                 .background(Color(nsColor: .textBackgroundColor))
             }
-        }
-    }
-
-    private func sourceDisplayName(_ source: LogEntry.LogSource) -> String {
-        switch source {
-        case .stdout: return "stdout"
-        case .stderr: return "stderr"
-        case .systemLog: return "System Log"
         }
     }
 }

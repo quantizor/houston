@@ -40,6 +40,7 @@ struct ContentView: View {
             KeyPaletteView()
         }
         .task {
+            await store.ensureHelperInstalled()
             await store.refreshJobs()
         }
         .onChange(of: store.isLoading) { _, isLoading in

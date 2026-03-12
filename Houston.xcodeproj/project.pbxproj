@@ -28,7 +28,20 @@
 		A1B2C3D4E5F60001000028AA /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60001000029AA /* ToastView.swift */; };
 		A1B2C3D4E5F6000100002AAA /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000100002BAA /* DesignTokens.swift */; };
 		A1B2C3D4E5F6000100002CAA /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000100002DAA /* PrivacyInfo.xcprivacy */; };
+		B1000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002 /* main.swift */; };
+		B1000003 /* com.quantizor.houston.helper in Embed Daemon */ = {isa = PBXBuildFile; fileRef = B1000004 /* com.quantizor.houston.helper */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1000005 /* com.quantizor.houston.helper.plist in Embed Daemon Plist */ = {isa = PBXBuildFile; fileRef = B1000006 /* com.quantizor.houston.helper.plist */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B1000010 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1B2C3D4E5F60001000060AA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B1000020;
+			remoteInfo = HoustonHelper;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A1B2C3D4E5F60001000002AA /* HoustonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoustonApp.swift; sourceTree = "<group>"; };
@@ -43,12 +56,17 @@
 		A1B2C3D4E5F60001000014AA /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000016AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000023AA /* Houston.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Houston.entitlements; sourceTree = "<group>"; };
+		B1000060 /* Houston.debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Houston.debug.entitlements; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000024AA /* Houston.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Houston.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F60001000025AA /* HoustonKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = HoustonKit; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000027AA /* DockIcon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DockIcon.png; sourceTree = "<group>"; };
 		A1B2C3D4E5F60001000029AA /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000100002BAA /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000100002DAA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B1000002 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B1000004 /* com.quantizor.houston.helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = com.quantizor.houston.helper; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1000006 /* com.quantizor.houston.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.quantizor.houston.helper.plist; sourceTree = "<group>"; };
+		B1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +81,11 @@
 				A1B2C3D4E5F60001000021AA /* PlistEditor in Frameworks */,
 			);
 		};
+		B1000030 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -70,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60001000041AA /* Houston */,
+				B1000040 /* HoustonHelper */,
 				A1B2C3D4E5F60001000025AA /* HoustonKit */,
 				A1B2C3D4E5F60001000042AA /* Products */,
 			);
@@ -81,6 +105,7 @@
 				A1B2C3D4E5F60001000002AA /* HoustonApp.swift */,
 				A1B2C3D4E5F60001000016AA /* Assets.xcassets */,
 				A1B2C3D4E5F60001000023AA /* Houston.entitlements */,
+				B1000060 /* Houston.debug.entitlements */,
 				A1B2C3D4E5F60001000043AA /* Store */,
 				A1B2C3D4E5F60001000044AA /* Views */,
 				A1B2C3D4E5F60001000045AA /* Resources */,
@@ -92,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60001000024AA /* Houston.app */,
+				B1000004 /* com.quantizor.houston.helper */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -130,7 +156,42 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		B1000040 /* HoustonHelper */ = {
+			isa = PBXGroup;
+			children = (
+				B1000002 /* main.swift */,
+				B1000006 /* com.quantizor.houston.helper.plist */,
+				B1000007 /* Info.plist */,
+			);
+			path = HoustonHelper;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B1000050 /* Embed Daemon */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				B1000003 /* com.quantizor.houston.helper in Embed Daemon */,
+			);
+			name = "Embed Daemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1000051 /* Embed Daemon Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/Library/LaunchDaemons";
+			dstSubfolderSpec = 1;
+			files = (
+				B1000005 /* com.quantizor.houston.helper.plist in Embed Daemon Plist */,
+			);
+			name = "Embed Daemon Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		A1B2C3D4E5F60001000050AA /* Houston */ = {
@@ -140,8 +201,13 @@
 				A1B2C3D4E5F60001000031AA /* Sources */,
 				A1B2C3D4E5F60001000030AA /* Frameworks */,
 				A1B2C3D4E5F60001000032AA /* Resources */,
+				B1000050 /* Embed Daemon */,
+				B1000051 /* Embed Daemon Plist */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				B1000011 /* PBXTargetDependency */,
 			);
 			name = Houston;
 			packageProductDependencies = (
@@ -156,7 +222,29 @@
 			productReference = A1B2C3D4E5F60001000024AA /* Houston.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B1000020 /* HoustonHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1000070 /* Build configuration list for PBXNativeTarget "HoustonHelper" */;
+			buildPhases = (
+				B1000031 /* Sources */,
+				B1000030 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			name = HoustonHelper;
+			productName = "com.quantizor.houston.helper";
+			productReference = B1000004 /* com.quantizor.houston.helper */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		B1000011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B1000020 /* HoustonHelper */;
+			targetProxy = B1000010 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		A1B2C3D4E5F60001000060AA /* Project object */ = {
@@ -183,6 +271,7 @@
 			projectRoot = "";
 			targets = (
 				A1B2C3D4E5F60001000050AA /* Houston */,
+				B1000020 /* HoustonHelper */,
 			);
 		};
 /* End PBXProject section */
@@ -214,6 +303,12 @@
 				A1B2C3D4E5F60001000013AA /* SidebarView.swift in Sources */,
 				A1B2C3D4E5F60001000028AA /* ToastView.swift in Sources */,
 				A1B2C3D4E5F6000100002AAA /* DesignTokens.swift in Sources */,
+			);
+		};
+		B1000031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				B1000001 /* main.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */
@@ -344,7 +439,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Houston/Houston.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Houston/Houston.debug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -403,6 +498,44 @@
 			};
 			name = Release;
 		};
+		B10000B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 98C3ZR73ZM;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = HoustonHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston.helper;
+				PRODUCT_NAME = com.quantizor.houston.helper;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B10000B2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 98C3ZR73ZM;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = HoustonHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston.helper;
+				PRODUCT_NAME = com.quantizor.houston.helper;
+				SKIP_INSTALL = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -419,6 +552,14 @@
 			buildConfigurations = (
 				A1B2C3D4E5F600010000A1AA /* Debug configuration for PBXProject "Houston" */,
 				A1B2C3D4E5F600010000A2AA /* Release configuration for PBXProject "Houston" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		B1000070 /* Build configuration list for PBXNativeTarget "HoustonHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000B1 /* Debug */,
+				B10000B2 /* Release */,
 			);
 			defaultConfigurationName = Release;
 		};

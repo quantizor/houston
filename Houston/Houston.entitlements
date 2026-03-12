@@ -15,7 +15,10 @@
 	</array>
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>
-		<string>com.houston.helper</string>
+		<string>com.quantizor.houston.helper</string>
+		<string>com.apple.logd</string>
+		<string>com.apple.logd.admin</string>
+		<string>com.apple.logd.events</string>
 	</array>
 </dict>
 </plist>

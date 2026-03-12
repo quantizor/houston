@@ -1,5 +1,9 @@
 import Foundation
+import os
 import Models
+import PrivilegedHelper
+
+private let logger = Logger(subsystem: "com.quantizor.houston", category: "LaunchctlExecutor")
 
 public struct ProcessResult: Sendable {
     public let exitCode: Int32
@@ -25,7 +29,24 @@ public struct LaunchctlListEntry: Sendable, Equatable {
     }
 }
 
-public struct LaunchctlExecutor: Sendable {
+// MARK: - Protocol
+
+public protocol LaunchctlExecuting: Sendable {
+    func list() async throws -> [LaunchctlListEntry]
+    func bootstrap(domain: String, plistPath: String) async throws
+    func bootout(domain: String, plistPath: String) async throws
+    func enable(serviceTarget: String) async throws
+    func disable(serviceTarget: String) async throws
+    func kickstart(serviceTarget: String) async throws
+    func print(serviceTarget: String) async throws -> String
+    func serviceInfo(serviceTarget: String) async -> ServiceInfo
+    func processStartTime(pid: Int) async -> Date?
+    func killProcess(pid: Int) async throws
+}
+
+// MARK: - Direct Process() executor (for development/testing outside sandbox)
+
+public struct LaunchctlExecutor: LaunchctlExecuting {
     private let launchctlPath = "/bin/launchctl"
 
     public init() {}
@@ -119,7 +140,6 @@ public struct LaunchctlExecutor: Sendable {
         return result.stdout
     }
 
-    /// Fetch runtime info for a specific service via `launchctl print`.
     public func serviceInfo(serviceTarget: String) async -> ServiceInfo {
         var info = ServiceInfo()
         guard let result = try? await run(["print", serviceTarget]),
@@ -138,7 +158,6 @@ public struct LaunchctlExecutor: Sendable {
         return info
     }
 
-    /// Fetch process start time via `ps` for a running PID.
     public func processStartTime(pid: Int) async -> Date? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
@@ -173,14 +192,34 @@ public struct LaunchctlExecutor: Sendable {
         }
     }
 
-    private static func parseInt(from output: String, key: String) -> Int? {
+    public func killProcess(pid: Int) async throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/kill")
+        process.arguments = ["-9", "\(pid)"]
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            process.terminationHandler = { _ in
+                continuation.resume()
+            }
+            do {
+                try process.run()
+            } catch {
+                process.terminationHandler = nil
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    // MARK: - Parsing helpers (static, shared with XPCLaunchctlExecutor)
+
+    static func parseInt(from output: String, key: String) -> Int? {
         guard let range = output.range(of: "\(key) = ") else { return nil }
         let rest = output[range.upperBound...]
         let line = rest.prefix(while: { $0 != "\n" && $0 != "\t" })
         return Int(line.trimmingCharacters(in: .whitespaces))
     }
 
-    private static func parseString(from output: String, key: String) -> String? {
+    static func parseString(from output: String, key: String) -> String? {
         guard let range = output.range(of: "\(key) = ") else { return nil }
         let rest = output[range.upperBound...]
         let line = rest.prefix(while: { $0 != "\n" })
@@ -188,14 +227,11 @@ public struct LaunchctlExecutor: Sendable {
         return value.isEmpty ? nil : value
     }
 
-    // MARK: - Parsing
-
     public static func parseListOutput(_ output: String) -> [LaunchctlListEntry] {
         let lines = output.components(separatedBy: "\n")
         var entries: [LaunchctlListEntry] = []
 
         for (index, line) in lines.enumerated() {
-            // Skip header line and empty lines
             if index == 0 || line.trimmingCharacters(in: .whitespaces).isEmpty {
                 continue
             }
@@ -220,5 +256,164 @@ public struct LaunchctlExecutor: Sendable {
         }
 
         return entries
+    }
+}
+
+// MARK: - XPC executor (for sandboxed app, delegates to privileged helper)
+
+public struct XPCLaunchctlExecutor: LaunchctlExecuting {
+    private let client: PrivilegedHelperClient
+
+    public init(client: PrivilegedHelperClient) {
+        self.client = client
+    }
+
+    public func list() async throws -> [LaunchctlListEntry] {
+        let result = try await client.executeLaunchctl(arguments: ["list"])
+        return LaunchctlExecutor.parseListOutput(result.stdout)
+    }
+
+    public func bootstrap(domain: String, plistPath: String) async throws {
+        _ = try await client.executeLaunchctl(arguments: ["bootstrap", domain, plistPath])
+    }
+
+    public func bootout(domain: String, plistPath: String) async throws {
+        _ = try await client.executeLaunchctl(arguments: ["bootout", domain, plistPath])
+    }
+
+    public func enable(serviceTarget: String) async throws {
+        _ = try await client.executeLaunchctl(arguments: ["enable", serviceTarget])
+    }
+
+    public func disable(serviceTarget: String) async throws {
+        _ = try await client.executeLaunchctl(arguments: ["disable", serviceTarget])
+    }
+
+    public func kickstart(serviceTarget: String) async throws {
+        _ = try await client.executeLaunchctl(arguments: ["kickstart", "-k", serviceTarget])
+    }
+
+    public func print(serviceTarget: String) async throws -> String {
+        let result = try await client.executeLaunchctl(arguments: ["print", serviceTarget])
+        return result.stdout
+    }
+
+    public func serviceInfo(serviceTarget: String) async -> ServiceInfo {
+        var info = ServiceInfo()
+        guard let result = try? await client.executeLaunchctl(arguments: ["print", serviceTarget]) else {
+            return info
+        }
+
+        let output = result.stdout
+        info.runs = LaunchctlExecutor.parseInt(from: output, key: "runs")
+        info.activeCount = LaunchctlExecutor.parseInt(from: output, key: "active count")
+        info.forks = LaunchctlExecutor.parseInt(from: output, key: "forks")
+        info.execs = LaunchctlExecutor.parseInt(from: output, key: "execs")
+        info.lastExitReason = LaunchctlExecutor.parseString(from: output, key: "last exit reason")
+        info.spawnType = LaunchctlExecutor.parseString(from: output, key: "spawn type")
+
+        return info
+    }
+
+    public func processStartTime(pid: Int) async -> Date? {
+        guard let result = try? await client.executeProcess(
+            path: "/bin/ps",
+            arguments: ["-p", "\(pid)", "-o", "lstart="]
+        ) else {
+            return nil
+        }
+
+        let str = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !str.isEmpty else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE MMM dd HH:mm:ss yyyy"
+        return formatter.date(from: str)
+    }
+
+    public func killProcess(pid: Int) async throws {
+        _ = try await client.executeProcess(
+            path: "/bin/kill",
+            arguments: ["-9", "\(pid)"]
+        )
+    }
+}
+
+// MARK: - Fallback executor (tries direct first, falls back to XPC)
+
+/// Attempts each operation via direct Process() first. If that fails (e.g. in a
+/// sandboxed app where Process() is blocked), falls back to the XPC helper.
+/// Direct-first is correct because launchctl commands like `list` are
+/// context-sensitive — running as root via XPC returns different results than
+/// running as the current user.
+public struct FallbackLaunchctlExecutor: LaunchctlExecuting {
+    private let xpc: XPCLaunchctlExecutor
+    private let direct: LaunchctlExecutor
+
+    public init(client: PrivilegedHelperClient) {
+        self.xpc = XPCLaunchctlExecutor(client: client)
+        self.direct = LaunchctlExecutor()
+    }
+
+    public func list() async throws -> [LaunchctlListEntry] {
+        do {
+            let result = try await direct.list()
+            logger.info("list: direct succeeded with \(result.count) entries")
+            return result
+        } catch {
+            logger.warning("list: direct failed (\(error)), trying XPC")
+            return try await xpc.list()
+        }
+    }
+
+    public func bootstrap(domain: String, plistPath: String) async throws {
+        do { try await direct.bootstrap(domain: domain, plistPath: plistPath) }
+        catch { try await xpc.bootstrap(domain: domain, plistPath: plistPath) }
+    }
+
+    public func bootout(domain: String, plistPath: String) async throws {
+        do { try await direct.bootout(domain: domain, plistPath: plistPath) }
+        catch { try await xpc.bootout(domain: domain, plistPath: plistPath) }
+    }
+
+    public func enable(serviceTarget: String) async throws {
+        do { try await direct.enable(serviceTarget: serviceTarget) }
+        catch { try await xpc.enable(serviceTarget: serviceTarget) }
+    }
+
+    public func disable(serviceTarget: String) async throws {
+        do { try await direct.disable(serviceTarget: serviceTarget) }
+        catch { try await xpc.disable(serviceTarget: serviceTarget) }
+    }
+
+    public func kickstart(serviceTarget: String) async throws {
+        do { try await direct.kickstart(serviceTarget: serviceTarget) }
+        catch { try await xpc.kickstart(serviceTarget: serviceTarget) }
+    }
+
+    public func print(serviceTarget: String) async throws -> String {
+        do { return try await direct.print(serviceTarget: serviceTarget) }
+        catch { return try await xpc.print(serviceTarget: serviceTarget) }
+    }
+
+    public func serviceInfo(serviceTarget: String) async -> ServiceInfo {
+        let info = await direct.serviceInfo(serviceTarget: serviceTarget)
+        if info.runs == nil && info.lastExitReason == nil {
+            return await xpc.serviceInfo(serviceTarget: serviceTarget)
+        }
+        return info
+    }
+
+    public func processStartTime(pid: Int) async -> Date? {
+        if let date = await direct.processStartTime(pid: pid) {
+            return date
+        }
+        return await xpc.processStartTime(pid: pid)
+    }
+
+    public func killProcess(pid: Int) async throws {
+        do { try await direct.killProcess(pid: pid) }
+        catch { try await xpc.killProcess(pid: pid) }
     }
 }

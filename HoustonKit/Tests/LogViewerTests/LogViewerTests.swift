@@ -126,6 +126,7 @@ struct FileTailReaderTests {
 
 struct MockJob: LoggableJob {
     var label: String
+    var executablePath: String?
     var standardOutPath: String?
     var standardErrorPath: String?
 }
@@ -138,7 +139,6 @@ struct LogReaderTests {
         let reader = LogReader()
         #expect(reader.entries.isEmpty)
         #expect(reader.isReading == false)
-        #expect(reader.activeSource == .systemLog)
         #expect(reader.filterText.isEmpty)
     }
 
@@ -149,8 +149,8 @@ struct LogReaderTests {
         #expect(reader.entries.isEmpty)
     }
 
-    @Test("Filtered entries by source")
-    func filterBySource() async throws {
+    @Test("Loads file-based logs when paths are set")
+    func loadFileLogs() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let stdoutURL = tempDir.appendingPathComponent("houston_test_stdout_\(UUID().uuidString).log")
         try "stdout line\n".write(to: stdoutURL, atomically: true, encoding: .utf8)
@@ -169,13 +169,10 @@ struct LogReaderTests {
         let reader = LogReader()
         await reader.loadLogs(for: job)
 
-        reader.activeSource = .stdout
-        let stdoutEntries = reader.filteredEntries
-        #expect(stdoutEntries.allSatisfy { $0.source == .stdout })
-
-        reader.activeSource = .stderr
-        let stderrEntries = reader.filteredEntries
-        #expect(stderrEntries.allSatisfy { $0.source == .stderr })
+        let entries = reader.filteredEntries
+        #expect(entries.count == 2)
+        #expect(entries.contains { $0.source == .stdout })
+        #expect(entries.contains { $0.source == .stderr })
     }
 
     @Test("Filtered entries by text")
@@ -189,7 +186,6 @@ struct LogReaderTests {
         let reader = LogReader()
         await reader.loadLogs(for: job)
 
-        reader.activeSource = .stdout
         reader.filterText = "hello"
         let filtered = reader.filteredEntries
         #expect(filtered.count == 2)
@@ -224,11 +220,10 @@ struct SystemLogReaderTests {
     }
 
     @Test("SystemLogReader query handles gracefully")
-    func queryGraceful() throws {
+    func queryGraceful() async {
         let reader = SystemLogReader()
-        // This may return a permission warning or empty results in test environment
-        let entries = try reader.query(label: "com.nonexistent.test.label")
-        // Should not crash - either returns entries or a warning
+        // Should not crash — returns empty for nonexistent label
+        let entries = await reader.query(label: "com.nonexistent.test.label")
         #expect(entries != nil)
     }
 }

@@ -3,10 +3,12 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.houston.helper</string>
+    <string>com.quantizor.houston.helper</string>
+    <key>BundleProgram</key>
+    <string>Contents/MacOS/com.quantizor.houston.helper</string>
     <key>MachServices</key>
     <dict>
-        <key>com.houston.helper</key>
+        <key>com.quantizor.houston.helper</key>
         <true/>
     </dict>
 </dict>

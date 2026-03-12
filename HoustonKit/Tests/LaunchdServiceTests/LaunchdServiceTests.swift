@@ -3,12 +3,36 @@ import Foundation
 @testable import LaunchdService
 @testable import Models
 
+// MARK: - Mock executor for testing
+
+struct MockLaunchctlExecutor: LaunchctlExecuting {
+    var listResult: [LaunchctlListEntry] = []
+    var listError: Error?
+
+    func list() async throws -> [LaunchctlListEntry] {
+        if let error = listError { throw error }
+        return listResult
+    }
+
+    func bootstrap(domain: String, plistPath: String) async throws {}
+    func bootout(domain: String, plistPath: String) async throws {}
+    func enable(serviceTarget: String) async throws {}
+    func disable(serviceTarget: String) async throws {}
+    func kickstart(serviceTarget: String) async throws {}
+
+    func print(serviceTarget: String) async throws -> String { "" }
+
+    func serviceInfo(serviceTarget: String) async -> ServiceInfo { ServiceInfo() }
+    func processStartTime(pid: Int) async -> Date? { nil }
+    func killProcess(pid: Int) async throws {}
+}
+
 @Suite("LaunchdService Tests")
 @MainActor
 struct LaunchdServiceTests {
     @Test("LaunchdService can be initialized")
     func canInit() {
-        let service = LaunchdService()
+        let service = LaunchdService(executor: MockLaunchctlExecutor())
         #expect(service.jobs.isEmpty)
         #expect(service.isLoading == false)
     }

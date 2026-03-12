@@ -4,7 +4,7 @@ import ServiceManagement
 
 /// XPC client for communicating with the privileged helper for root operations.
 public final class PrivilegedHelperClient: @unchecked Sendable {
-    private let helperBundleID = "com.houston.helper"
+    private let helperBundleID = "com.quantizor.houston.helper"
     private var connection: NSXPCConnection?
     private let lock = NSLock()
 
@@ -131,7 +131,8 @@ public final class PrivilegedHelperClient: @unchecked Sendable {
     }
 
     /// Execute a launchctl command via the privileged helper.
-    public func executeLaunchctl(arguments: [String]) async throws -> (stdout: String, stderr: String) {
+    /// Pass `asUser` to run in a specific user's context (default: current user).
+    public func executeLaunchctl(arguments: [String], asUser uid: UInt32 = UInt32(getuid())) async throws -> (stdout: String, stderr: String) {
         let conn = try getConnection()
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -139,12 +140,54 @@ public final class PrivilegedHelperClient: @unchecked Sendable {
                 continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
             } as! HelperProtocol
 
-            helper.executeLaunchctl(arguments: arguments) { success, stdout, stderr in
+            helper.executeLaunchctl(arguments: arguments, asUser: uid) { success, stdout, stderr in
                 if success {
                     continuation.resume(returning: (stdout: stdout ?? "", stderr: stderr ?? ""))
                 } else {
                     continuation.resume(throwing: PrivilegedHelperError.operationFailed(
                         stderr ?? "launchctl command failed"
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Execute a whitelisted process via the privileged helper.
+    public func executeProcess(path: String, arguments: [String]) async throws -> (stdout: String, stderr: String) {
+        let conn = try getConnection()
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let helper = conn.remoteObjectProxyWithErrorHandler { error in
+                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
+            } as! HelperProtocol
+
+            helper.executeProcess(path: path, arguments: arguments) { success, stdout, stderr in
+                if success {
+                    continuation.resume(returning: (stdout: stdout ?? "", stderr: stderr ?? ""))
+                } else {
+                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
+                        stderr ?? "Process execution failed"
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Query system logs via the privileged helper (runs `log show` as root).
+    public func querySystemLog(predicate: String, sinceInterval: Double, limit: Int = 500) async throws -> String {
+        let conn = try getConnection()
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let helper = conn.remoteObjectProxyWithErrorHandler { error in
+                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
+            } as! HelperProtocol
+
+            helper.querySystemLog(predicate: predicate, sinceInterval: sinceInterval, limit: limit) { success, stdout, stderr in
+                if success {
+                    continuation.resume(returning: stdout ?? "")
+                } else {
+                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
+                        stderr ?? "Log query failed"
                     ))
                 }
             }

@@ -1,22 +1,23 @@
 import Foundation
 import Observation
-import Security
-import CAuthHelper
+import os
 import Models
 import PrivilegedHelper
+
+private let logger = Logger(subsystem: "com.quantizor.houston", category: "LaunchdService")
 
 @Observable @MainActor
 public final class LaunchdService {
     public private(set) var jobs: [LaunchdJob] = []
     public private(set) var isLoading: Bool = false
 
-    private let executor: LaunchctlExecutor
+    private let executor: any LaunchctlExecuting
     private let parser: PlistParser
     private let writer: PlistWriter
     private let privilegedHelper: PrivilegedHelperClient
 
     public init(
-        executor: LaunchctlExecutor = LaunchctlExecutor(),
+        executor: any LaunchctlExecuting = LaunchctlExecutor(),
         parser: PlistParser = PlistParser(),
         writer: PlistWriter = PlistWriter(),
         privilegedHelper: PrivilegedHelperClient = PrivilegedHelperClient()
@@ -35,9 +36,19 @@ public final class LaunchdService {
         isLoading = true
         defer { isLoading = false }
 
+        logger.info("loadAllJobs: starting")
+
         // Kick off status fetch concurrently with discovery
-        let statusTask = Task.detached { [executor] in
-            try await executor.list()
+        let executor = self.executor
+        let statusTask = Task.detached {
+            do {
+                let entries = try await executor.list()
+                logger.info("loadAllJobs: list returned \(entries.count) entries")
+                return entries
+            } catch {
+                logger.error("loadAllJobs: list failed: \(error)")
+                throw error
+            }
         }
 
         // Discover all plist URLs off the main thread
@@ -118,124 +129,6 @@ public final class LaunchdService {
         }
     }
 
-    // MARK: - Privilege escalation
-
-    /// Run a launchctl command, using the privileged helper if available, falling back to authorized shell.
-    private func runPrivilegedLaunchctl(_ arguments: [String]) async throws {
-        if await privilegedHelper.isHelperAvailable() {
-            _ = try await privilegedHelper.executeLaunchctl(arguments: arguments)
-        } else {
-            let shellCmd = shellEscape(["/bin/launchctl"] + arguments)
-            try await runPrivilegedShellCommands([shellCmd])
-        }
-    }
-
-    /// Shell-escape an array of arguments into a single command string.
-    private nonisolated func shellEscape(_ arguments: [String]) -> String {
-        arguments
-            .map { "'" + $0.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-            .joined(separator: " ")
-    }
-
-    /// Run one or more shell commands with a single admin authentication prompt.
-    /// Uses Security.framework AuthorizationCreate for the native macOS auth dialog,
-    /// which supports Touch ID on Apple Silicon Macs.
-    @discardableResult
-    private nonisolated func runPrivilegedShellCommands(_ commands: [String]) async throws -> String {
-        let combined = commands.joined(separator: " ; ")
-
-        return try await withCheckedThrowingContinuation { continuation in
-            // Create an authorization reference requesting the right to execute
-            var authRef: AuthorizationRef?
-            var item = kAuthorizationRightExecute.withCString { name in
-                AuthorizationItem(
-                    name: name,
-                    valueLength: 0,
-                    value: nil,
-                    flags: 0
-                )
-            }
-            var rights = withUnsafeMutablePointer(to: &item) { ptr in
-                AuthorizationRights(count: 1, items: ptr)
-            }
-            let flags: AuthorizationFlags = [.interactionAllowed, .preAuthorize, .extendRights]
-
-            let status = AuthorizationCreate(&rights, nil, flags, &authRef)
-
-            guard status == errAuthorizationSuccess, let ref = authRef else {
-                if status == errAuthorizationCanceled {
-                    continuation.resume(throwing: LaunchctlError.commandFailed(
-                        exitCode: -1, stderr: "Authorization canceled"
-                    ))
-                } else {
-                    continuation.resume(throwing: LaunchctlError.commandFailed(
-                        exitCode: Int32(status), stderr: "Authorization failed (OSStatus \(status))"
-                    ))
-                }
-                return
-            }
-
-            defer { AuthorizationFree(ref, []) }
-
-            // Execute via /bin/sh -c with the authorized ref
-            let tool = "/bin/sh"
-
-            // Run via our C helper which calls AuthorizationExecuteWithPrivileges
-            // through dlsym. The native auth dialog supports Touch ID on Apple Silicon.
-            var outputPipe: UnsafeMutablePointer<FILE>?
-            let execStatus = AuthorizationExecuteCommand(
-                ref, tool, "-c", combined, &outputPipe
-            )
-
-            guard execStatus == errAuthorizationSuccess else {
-                if execStatus == errAuthorizationCanceled {
-                    continuation.resume(throwing: LaunchctlError.commandFailed(
-                        exitCode: -1, stderr: "Authorization canceled"
-                    ))
-                } else {
-                    continuation.resume(throwing: LaunchctlError.commandFailed(
-                        exitCode: Int32(execStatus), stderr: "Privileged execution failed (OSStatus \(execStatus))"
-                    ))
-                }
-                return
-            }
-
-            // Read output from the pipe
-            var output = ""
-            if let pipe = outputPipe {
-                let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: true)
-                let data = fileHandle.readDataToEndOfFile()
-                output = String(data: data, encoding: .utf8) ?? ""
-                fclose(pipe)
-            }
-
-            continuation.resume(returning: output)
-        }
-    }
-
-    /// Write data to a privileged path, helper-first with authorized shell fallback.
-    private func writePrivileged(_ data: Data, toPath path: String) async throws {
-        if await privilegedHelper.isHelperAvailable() {
-            try await privilegedHelper.writePlist(data, toPath: path)
-        } else {
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".plist")
-            try data.write(to: tempURL)
-            let cmd = "cp \(shellEscape([tempURL.path])) \(shellEscape([path]))"
-            try await runPrivilegedShellCommands([cmd])
-            try? FileManager.default.removeItem(at: tempURL)
-        }
-    }
-
-    /// Delete a file at a privileged path, helper-first with authorized shell fallback.
-    private func deletePrivileged(atPath path: String) async throws {
-        if await privilegedHelper.isHelperAvailable() {
-            try await privilegedHelper.deletePlist(atPath: path)
-        } else {
-            let cmd = "rm \(shellEscape([path]))"
-            try await runPrivilegedShellCommands([cmd])
-        }
-    }
-
     // MARK: - Service Info
 
     /// Fetch detailed runtime info for a specific job from launchctl print.
@@ -256,33 +149,21 @@ public final class LaunchdService {
     /// Bootstrap (load) a job into launchd.
     public func loadJob(_ job: LaunchdJob) async throws {
         let domain = job.domain.launchctlDomain
-        if job.domain.requiresPrivilege {
-            try await runPrivilegedLaunchctl(["bootstrap", domain, job.plistURL.path])
-        } else {
-            try await executor.bootstrap(domain: domain, plistPath: job.plistURL.path)
-        }
+        try await executor.bootstrap(domain: domain, plistPath: job.plistURL.path)
         try await refreshStatus()
     }
 
     /// Bootout (unload) a job from launchd.
     public func unloadJob(_ job: LaunchdJob) async throws {
         let domain = job.domain.launchctlDomain
-        if job.domain.requiresPrivilege {
-            try await runPrivilegedLaunchctl(["bootout", domain, job.plistURL.path])
-        } else {
-            try await executor.bootout(domain: domain, plistPath: job.plistURL.path)
-        }
+        try await executor.bootout(domain: domain, plistPath: job.plistURL.path)
         try await refreshStatus()
     }
 
     /// Enable a job.
     public func enableJob(_ job: LaunchdJob) async throws {
         let serviceTarget = "\(job.domain.launchctlDomain)/\(job.label)"
-        if job.domain.requiresPrivilege {
-            try await runPrivilegedLaunchctl(["enable", serviceTarget])
-        } else {
-            try await executor.enable(serviceTarget: serviceTarget)
-        }
+        try await executor.enable(serviceTarget: serviceTarget)
         if let index = jobs.firstIndex(where: { $0.id == job.id }) {
             jobs[index].isEnabled = true
         }
@@ -291,11 +172,7 @@ public final class LaunchdService {
     /// Disable a job.
     public func disableJob(_ job: LaunchdJob) async throws {
         let serviceTarget = "\(job.domain.launchctlDomain)/\(job.label)"
-        if job.domain.requiresPrivilege {
-            try await runPrivilegedLaunchctl(["disable", serviceTarget])
-        } else {
-            try await executor.disable(serviceTarget: serviceTarget)
-        }
+        try await executor.disable(serviceTarget: serviceTarget)
         if let index = jobs.firstIndex(where: { $0.id == job.id }) {
             jobs[index].isEnabled = false
         }
@@ -304,11 +181,13 @@ public final class LaunchdService {
     /// Kickstart (run) a job immediately.
     public func startJob(_ job: LaunchdJob) async throws {
         let serviceTarget = "\(job.domain.launchctlDomain)/\(job.label)"
-        if job.domain.requiresPrivilege {
-            try await runPrivilegedLaunchctl(["kickstart", "-k", serviceTarget])
-        } else {
-            try await executor.kickstart(serviceTarget: serviceTarget)
-        }
+        try await executor.kickstart(serviceTarget: serviceTarget)
+        try await refreshStatus()
+    }
+
+    /// Force-kill a running process by PID.
+    public func killProcess(pid: Int) async throws {
+        try await executor.killProcess(pid: pid)
         try await refreshStatus()
     }
 
@@ -324,7 +203,7 @@ public final class LaunchdService {
 
         if domain.requiresPrivilege {
             let data = try writer.createNewData(label: label, programArguments: programArguments)
-            try await writePrivileged(data, toPath: plistURL.path)
+            try await privilegedHelper.writePlist(data, toPath: plistURL.path)
         } else {
             try writer.createNew(label: label, programArguments: programArguments, at: plistURL)
         }
@@ -342,7 +221,7 @@ public final class LaunchdService {
         }
 
         if job.domain.requiresPrivilege {
-            try await deletePrivileged(atPath: job.plistURL.path)
+            try await privilegedHelper.deletePlist(atPath: job.plistURL.path)
         } else {
             try FileManager.default.removeItem(at: job.plistURL)
         }
@@ -351,13 +230,12 @@ public final class LaunchdService {
         jobs.removeAll { $0.id == job.id }
     }
 
-    /// Delete multiple jobs in a batch, prompting for authentication only once.
+    /// Delete multiple jobs in a batch.
     public func deleteJobs(_ jobsToDelete: [LaunchdJob]) async throws {
-        // Separate into privileged vs user-domain jobs
         let privilegedJobs = jobsToDelete.filter { $0.domain.requiresPrivilege }
         let userJobs = jobsToDelete.filter { !$0.domain.requiresPrivilege }
 
-        // Handle user-domain jobs without privilege escalation
+        // Handle user-domain jobs
         for job in userJobs {
             if job.status.isLoaded {
                 try? await executor.bootout(domain: job.domain.launchctlDomain, plistPath: job.plistURL.path)
@@ -365,31 +243,14 @@ public final class LaunchdService {
             try? FileManager.default.removeItem(at: job.plistURL)
         }
 
-        // Batch privileged operations into a single auth prompt
-        if !privilegedJobs.isEmpty {
-            if await privilegedHelper.isHelperAvailable() {
-                // XPC helper: already authenticated, run sequentially
-                for job in privilegedJobs {
-                    if job.status.isLoaded {
-                        _ = try? await privilegedHelper.executeLaunchctl(arguments: [
-                            "bootout", job.domain.launchctlDomain, job.plistURL.path
-                        ])
-                    }
-                    try? await privilegedHelper.deletePlist(atPath: job.plistURL.path)
-                }
-            } else {
-                // Collect all shell commands, execute with single auth prompt
-                var commands: [String] = []
-                for job in privilegedJobs {
-                    if job.status.isLoaded {
-                        commands.append(shellEscape([
-                            "/bin/launchctl", "bootout", job.domain.launchctlDomain, job.plistURL.path
-                        ]))
-                    }
-                    commands.append("rm \(shellEscape([job.plistURL.path]))")
-                }
-                try await runPrivilegedShellCommands(commands)
+        // Handle privileged jobs via XPC helper
+        for job in privilegedJobs {
+            if job.status.isLoaded {
+                _ = try? await privilegedHelper.executeLaunchctl(arguments: [
+                    "bootout", job.domain.launchctlDomain, job.plistURL.path
+                ])
             }
+            try? await privilegedHelper.deletePlist(atPath: job.plistURL.path)
         }
 
         // Remove from local list
@@ -402,7 +263,7 @@ public final class LaunchdService {
     public func saveJob(_ job: LaunchdJob) async throws {
         if job.domain.requiresPrivilege {
             let data = try writer.writeData(job: job)
-            try await writePrivileged(data, toPath: job.plistURL.path)
+            try await privilegedHelper.writePlist(data, toPath: job.plistURL.path)
         } else {
             try writer.write(job: job, to: job.plistURL)
         }

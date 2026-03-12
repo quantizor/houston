@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import Models
+import PrivilegedHelper
 
 extension LaunchdJob: LoggableJob {}
 
@@ -8,25 +9,24 @@ extension LaunchdJob: LoggableJob {}
 public final class LogReader {
     public private(set) var entries: [LogEntry] = []
     public private(set) var isReading: Bool = false
-    public var activeSource: LogEntry.LogSource = .systemLog
     public var filterText: String = ""
 
     private var stdoutReader: FileTailReader?
     private var stderrReader: FileTailReader?
-    private let systemLogReader = SystemLogReader()
+    private let systemLogReader: SystemLogReader
     private var currentJobLabel: String?
+    private var currentExecutablePath: String?
 
     public var filteredEntries: [LogEntry] {
-        var result = entries.filter { $0.source == activeSource }
-        if !filterText.isEmpty {
-            result = result.filter {
-                $0.message.localizedCaseInsensitiveContains(filterText)
-            }
+        if filterText.isEmpty { return entries }
+        return entries.filter {
+            $0.message.localizedCaseInsensitiveContains(filterText)
         }
-        return result
     }
 
-    public init() {}
+    public init(helperClient: PrivilegedHelperClient = PrivilegedHelperClient()) {
+        self.systemLogReader = SystemLogReader(helperClient: helperClient)
+    }
 
     public func loadLogs(for job: some LoggableJob) async {
         isReading = true
@@ -34,7 +34,9 @@ public final class LogReader {
 
         entries = []
         currentJobLabel = job.label
+        currentExecutablePath = job.executablePath
 
+        // Set up file readers if paths exist
         if let stdoutPath = job.standardOutPath {
             stdoutReader = FileTailReader(fileURL: URL(fileURLWithPath: stdoutPath), source: .stdout)
         } else {
@@ -59,18 +61,15 @@ public final class LogReader {
                 entries.append(contentsOf: newEntries)
             }
         }
-
         if let reader = stderrReader {
             if let newEntries = try? await reader.readNew() {
                 entries.append(contentsOf: newEntries)
             }
         }
-
         if let label = currentJobLabel {
             let lastSystemEntry = entries.last(where: { $0.source == .systemLog })?.timestamp
-            if let systemEntries = try? systemLogReader.query(label: label, since: lastSystemEntry) {
-                entries.append(contentsOf: systemEntries)
-            }
+            let systemEntries = await systemLogReader.query(label: label, executablePath: currentExecutablePath, since: lastSystemEntry)
+            entries.append(contentsOf: systemEntries)
         }
     }
 
@@ -79,22 +78,20 @@ public final class LogReader {
     }
 
     private func readAllSources() async {
+        // Read all available sources — file logs and system log
         if let reader = stdoutReader {
             if let fileEntries = try? await reader.readAll() {
                 entries.append(contentsOf: fileEntries)
             }
         }
-
         if let reader = stderrReader {
             if let fileEntries = try? await reader.readAll() {
                 entries.append(contentsOf: fileEntries)
             }
         }
-
         if let label = currentJobLabel {
-            if let systemEntries = try? systemLogReader.query(label: label) {
-                entries.append(contentsOf: systemEntries)
-            }
+            let systemEntries = await systemLogReader.query(label: label, executablePath: currentExecutablePath)
+            entries.append(contentsOf: systemEntries)
         }
 
         entries.sort { ($0.timestamp ?? .distantPast) < ($1.timestamp ?? .distantPast) }

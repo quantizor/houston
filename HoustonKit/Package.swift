@@ -29,7 +29,7 @@ let package = Package(
         ),
         .target(
             name: "LaunchdService",
-            dependencies: ["Models", "PrivilegedHelper", "CAuthHelper"]
+            dependencies: ["Models", "PrivilegedHelper"]
         ),
         .target(
             name: "PrivilegedHelper",
@@ -41,7 +41,7 @@ let package = Package(
         ),
         .target(
             name: "LogViewer",
-            dependencies: ["Models"]
+            dependencies: ["Models", "PrivilegedHelper"]
         ),
         .target(
             name: "PlistEditor",
