@@ -6,7 +6,7 @@ Houston is a free, open-source macOS launchd GUI — a democratized alternative 
 
 ## Stack
 
-- Swift 6 / SwiftUI, macOS 14+ (Sonoma)
+- Swift 6 / SwiftUI, macOS 26+ (Tahoe)
 - Swift Package Manager (HoustonKit local package)
 - XPC privileged helper for /Library operations
 - No external dependencies beyond Apple frameworks

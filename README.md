@@ -1,8 +1,14 @@
-# Houston
+<p align="center">
+  <img src="icon.png" width="128" height="128" alt="Houston app icon">
+</p>
 
-Mission control for macOS launch daemons and agents. Free and open source.
+<h1 align="center">Houston</h1>
 
-A native SwiftUI alternative to [LaunchControl](https://www.soma-zone.com/LaunchControl/).
+<p align="center">Mission control for macOS launch daemons and agents. Free and open source.</p>
+
+<p align="center">
+  <img src="assets/screenshot.png" width="720" alt="Houston screenshot">
+</p>
 
 ## What it does
 
@@ -10,7 +16,7 @@ Browse, create, edit, and manage every launchd job on your Mac — user agents, 
 
 ## Requirements
 
-macOS 14 (Sonoma) or later. Xcode 16+ to build from source.
+macOS 26 (Tahoe) or later. Xcode 26+ to build from source.
 
 ## Get started
 
