@@ -1,0 +1,32 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Swift sources
+*.swift text diff=swift
+
+# Xcode project files — treat as text for diffs but merge carefully
+*.pbxproj text -diff merge=union
+*.xcscheme text
+*.xcconfig text
+
+# Plists
+*.plist text
+
+# Markdown / documentation
+*.md text diff=markdown
+
+# Shell scripts
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Images — binary, no text conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+
+# Archives — binary
+*.zip binary
+*.gz binary

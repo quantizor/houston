@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- macOS squircle clip path -->
+    <clipPath id="iconClip">
+      <rect width="1024" height="1024" rx="225" ry="225"/>
+    </clipPath>
+    <!-- Background gradient - deep space -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#1a2744"/>
+      <stop offset="100%" stop-color="#0d1529"/>
+    </linearGradient>
+    <!-- Shuttle body gradient -->
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e8e0d4"/>
+      <stop offset="40%" stop-color="#f5f0ea"/>
+      <stop offset="100%" stop-color="#d9d0c3"/>
+    </linearGradient>
+    <!-- Nose tip gradient -->
+    <linearGradient id="noseGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#2a2a2a"/>
+      <stop offset="100%" stop-color="#444444"/>
+    </linearGradient>
+    <!-- Window glow -->
+    <radialGradient id="windowGlow" cx="0.4" cy="0.4" r="0.6">
+      <stop offset="0%" stop-color="#8ed5ff"/>
+      <stop offset="100%" stop-color="#3a8fd4"/>
+    </radialGradient>
+    <!-- Flame gradient orange -->
+    <linearGradient id="flameOuter" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#ff6b2b"/>
+      <stop offset="60%" stop-color="#ff9500"/>
+      <stop offset="100%" stop-color="#ffcc00" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Flame gradient inner -->
+    <linearGradient id="flameInner" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#ffe8a0"/>
+      <stop offset="50%" stop-color="#ffcc44"/>
+      <stop offset="100%" stop-color="#ff8800" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Wing gradient -->
+    <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#c4bab0"/>
+      <stop offset="100%" stop-color="#e0d8ce"/>
+    </linearGradient>
+    <!-- Booster gradient -->
+    <linearGradient id="boosterGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#e07830"/>
+      <stop offset="100%" stop-color="#c45a20"/>
+    </linearGradient>
+    <!-- NASA worm logo red -->
+    <linearGradient id="nasaRed" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fc3d21"/>
+      <stop offset="100%" stop-color="#e02010"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Clipped icon area -->
+  <g clip-path="url(#iconClip)">
+    <!-- Background -->
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+
+    <!-- Subtle stars -->
+    <circle cx="150" cy="130" r="3" fill="#ffffff" opacity="0.7"/>
+    <circle cx="870" cy="170" r="2.5" fill="#ffffff" opacity="0.6"/>
+    <circle cx="100" cy="450" r="2" fill="#ffffff" opacity="0.5"/>
+    <circle cx="920" cy="490" r="2.5" fill="#ffffff" opacity="0.55"/>
+    <circle cx="200" cy="800" r="2" fill="#ffffff" opacity="0.4"/>
+    <circle cx="830" cy="830" r="3" fill="#ffffff" opacity="0.45"/>
+    <circle cx="700" cy="100" r="2" fill="#ffffff" opacity="0.5"/>
+    <circle cx="340" cy="70" r="1.8" fill="#ffffff" opacity="0.6"/>
+    <circle cx="950" cy="350" r="1.5" fill="#ffffff" opacity="0.4"/>
+    <circle cx="80" cy="290" r="2.2" fill="#ffffff" opacity="0.35"/>
+    <circle cx="900" cy="650" r="1.8" fill="#ffffff" opacity="0.5"/>
+    <circle cx="160" cy="640" r="2" fill="#ffffff" opacity="0.3"/>
+
+    <!-- Everything is rotated ~15 degrees for a launching angle -->
+    <g transform="translate(512, 512) rotate(-15) translate(-512, -512)">
+
+      <!-- ======== FLAMES ======== -->
+      <!-- Outer flame - left engine -->
+      <ellipse cx="438" cy="850" rx="34" ry="140" fill="url(#flameOuter)" opacity="0.9"/>
+      <!-- Inner flame - left engine -->
+      <ellipse cx="438" cy="840" rx="17" ry="108" fill="url(#flameInner)" opacity="0.95"/>
+
+      <!-- Outer flame - right engine -->
+      <ellipse cx="586" cy="850" rx="34" ry="140" fill="url(#flameOuter)" opacity="0.9"/>
+      <!-- Inner flame - right engine -->
+      <ellipse cx="586" cy="840" rx="17" ry="108" fill="url(#flameInner)" opacity="0.95"/>
+
+      <!-- Center flame (main engine) -->
+      <ellipse cx="512" cy="870" rx="50" ry="170" fill="url(#flameOuter)" opacity="0.85"/>
+      <ellipse cx="512" cy="858" rx="25" ry="130" fill="url(#flameInner)" opacity="0.95"/>
+
+      <!-- ======== SIDE BOOSTERS ======== -->
+      <!-- Left booster -->
+      <rect x="362" y="340" width="60" height="340" rx="30" ry="30" fill="url(#boosterGrad)"/>
+      <ellipse cx="392" cy="340" rx="30" ry="14" fill="#d48838"/>
+      <rect x="368" y="658" width="48" height="24" rx="5" fill="#888"/>
+      <!-- Left booster - "USA" text -->
+      <text x="392" y="545" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="22" fill="#ffffff" text-anchor="middle" letter-spacing="2" opacity="0.9">USA</text>
+
+      <!-- Right booster -->
+      <rect x="602" y="340" width="60" height="340" rx="30" ry="30" fill="url(#boosterGrad)"/>
+      <ellipse cx="632" cy="340" rx="30" ry="14" fill="#d48838"/>
+      <rect x="608" y="658" width="48" height="24" rx="5" fill="#888"/>
+      <!-- Right booster - "USA" text -->
+      <text x="632" y="545" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="22" fill="#ffffff" text-anchor="middle" letter-spacing="2" opacity="0.9">USA</text>
+
+      <!-- ======== WINGS ======== -->
+      <!-- Left wing -->
+      <path d="M445,560 L260,730 L300,745 L460,655 Z" fill="url(#wingGrad)" stroke="#b0a89e" stroke-width="2.5"/>
+      <!-- Right wing -->
+      <path d="M579,560 L764,730 L724,745 L564,655 Z" fill="url(#wingGrad)" stroke="#b0a89e" stroke-width="2.5"/>
+
+      <!-- ======== SHUTTLE BODY ======== -->
+      <!-- Main fuselage - bigger, fills icon -->
+      <path d="
+        M512,80
+        C535,80 585,160 598,280
+        L608,590
+        C612,660 588,710 575,725
+        L449,725
+        C436,710 412,660 416,590
+        L426,280
+        C439,160 489,80 512,80
+        Z
+      " fill="url(#bodyGrad)" stroke="#c0b8ae" stroke-width="3"/>
+
+      <!-- Nose cone overlay (darker tip) -->
+      <path d="
+        M512,80
+        C528,80 558,125 568,180
+        L456,180
+        C466,125 496,80 512,80
+        Z
+      " fill="url(#noseGrad)"/>
+
+      <!-- ======== NASA WORM LOGO ======== -->
+      <!-- Rendered as stylized text on the fuselage -->
+      <text x="512" y="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="800" font-size="52" fill="url(#nasaRed)" text-anchor="middle" letter-spacing="6" opacity="0.85">NASA</text>
+
+      <!-- USA flag stripe accent (below NASA) -->
+      <rect x="462" y="445" width="100" height="4" rx="2" fill="#3a7dd4" opacity="0.8"/>
+      <rect x="462" y="453" width="100" height="4" rx="2" fill="#cc2222" opacity="0.7"/>
+
+      <!-- Body stripe - blue accent -->
+      <rect x="448" y="380" width="128" height="14" rx="7" fill="#3a7dd4" opacity="0.6"/>
+
+      <!-- ======== WINDOWS ======== -->
+      <!-- Main cockpit window - big and cute -->
+      <ellipse cx="512" cy="260" rx="46" ry="52" fill="url(#windowGlow)" stroke="#2a6ab0" stroke-width="3.5"/>
+      <!-- Window shine/reflection -->
+      <ellipse cx="497" cy="245" rx="17" ry="22" fill="#ffffff" opacity="0.35"/>
+      <circle cx="535" cy="270" r="7" fill="#ffffff" opacity="0.15"/>
+
+      <!-- Small porthole windows -->
+      <circle cx="512" cy="370" r="17" fill="url(#windowGlow)" stroke="#2a6ab0" stroke-width="3"/>
+      <circle cx="503" cy="364" r="5.5" fill="#ffffff" opacity="0.3"/>
+
+      <circle cx="512" cy="500" r="14" fill="url(#windowGlow)" stroke="#2a6ab0" stroke-width="2.5"/>
+      <circle cx="504" cy="495" r="4.5" fill="#ffffff" opacity="0.3"/>
+
+      <!-- ======== ENGINE NOZZLES ======== -->
+      <ellipse cx="480" cy="728" rx="22" ry="10" fill="#666"/>
+      <ellipse cx="480" cy="728" rx="15" ry="6" fill="#444"/>
+      <ellipse cx="544" cy="728" rx="22" ry="10" fill="#666"/>
+      <ellipse cx="544" cy="728" rx="15" ry="6" fill="#444"/>
+
+      <!-- ======== TAIL FIN ======== -->
+      <path d="M506,540 L512,440 L518,540 L558,640 L512,615 L466,640 Z" fill="#e0d8ce" stroke="#b0a89e" stroke-width="1.5" opacity="0.6"/>
+
+      <!-- ======== "USA" ON BODY ======== -->
+      <text x="512" y="615" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="32" fill="#333333" text-anchor="middle" letter-spacing="8" opacity="0.5">USA</text>
+
+    </g>
+  </g>
+</svg>
