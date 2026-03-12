@@ -67,6 +67,7 @@
 		B1000004 /* com.quantizor.houston.helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = com.quantizor.houston.helper; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000006 /* com.quantizor.houston.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.quantizor.houston.helper.plist; sourceTree = "<group>"; };
 		B1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B1000061 /* HoustonHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HoustonHelper.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +163,7 @@
 				B1000002 /* main.swift */,
 				B1000006 /* com.quantizor.houston.helper.plist */,
 				B1000007 /* Info.plist */,
+				B1000061 /* HoustonHelper.entitlements */,
 			);
 			path = HoustonHelper;
 			sourceTree = "<group>";
@@ -501,6 +503,7 @@
 		B10000B1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HoustonHelper/HoustonHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
@@ -520,6 +523,7 @@
 		B10000B2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HoustonHelper/HoustonHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
