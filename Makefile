@@ -2,6 +2,12 @@
 
 .DEFAULT_GOAL := help
 
+# Allow: make release patch, make release minor, make release major
+ifneq ($(filter patch minor major,$(MAKECMDGOALS)),)
+  BUMP := $(filter patch minor major,$(MAKECMDGOALS))
+endif
+patch minor major:; @true
+
 # Build ────────────────────────────────────────
 
 .PHONY: build
@@ -127,9 +133,24 @@ dmg: notarize ## Create notarized DMG
 	@printf "  \033[1m$(DMG_NAME)\033[0m\n"
 	@echo ""
 
+BUMP         ?= patch
+NEXT_VERSION  = $(shell echo "$(VERSION)" | awk -F. -v bump="$(BUMP)" '{ \
+	if (bump == "major") { printf "%d.0.0", $$1+1 } \
+	else if (bump == "minor") { printf "%d.%d.0", $$1, $$2+1 } \
+	else { printf "%d.%d.%d", $$1, $$2, (NF>=3 ? $$3+1 : 1) } }')
+
 .PHONY: release
-release: dmg ## Full release pipeline (archive + sign + notarize + DMG)
-	@printf "  \033[32mRelease ready:\033[0m $(DMG_PATH)\n\n"
+release: ## Release: make release [patch|minor|major]
+	@printf "  $(VERSION) → $(NEXT_VERSION)\n"
+	@sed -i '' 's/MARKETING_VERSION = .*/MARKETING_VERSION = $(NEXT_VERSION);/' Houston.xcodeproj/project.pbxproj
+	@git add Houston.xcodeproj/project.pbxproj
+	@git commit -m "Bump version to $(NEXT_VERSION)"
+	@git tag "v$(NEXT_VERSION)"
+	@$(MAKE) dmg VERSION=$(NEXT_VERSION)
+	@gh release create "v$(NEXT_VERSION)" "$(BUILD_DIR)/Houston-$(NEXT_VERSION)-$(ARCH).dmg" \
+		--title "Houston $(NEXT_VERSION)" \
+		--generate-notes
+	@printf "\n  \033[32mReleased Houston $(NEXT_VERSION)\033[0m\n\n"
 
 # Clean ────────────────────────────────────────
 
