@@ -19,7 +19,7 @@ enum DetailTab: String, CaseIterable {
 struct DetailView: View {
     @Environment(AppStore.self) private var store
     @State private var selectedTab: DetailTab = .standard
-    @State private var showInspector: Bool = true
+    @State private var showInspector: Bool = false
 
     var body: some View {
         ZStack {
@@ -82,6 +82,9 @@ struct DetailView: View {
                 }
                 .help("Toggle inspector panel")
             }
+        }
+        .onChange(of: store.selectedJob?.id) { _, newValue in
+            showInspector = newValue != nil
         }
     }
 }

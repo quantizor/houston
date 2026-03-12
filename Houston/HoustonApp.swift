@@ -5,14 +5,6 @@ import AppKit
 struct HoustonApp: App {
     @State private var appStore = AppStore()
 
-    init() {
-        #if DEBUG
-        // InjectionIII: hot-reload view bodies during development
-        // Install from: https://github.com/johnno1962/InjectionIII
-        Bundle(path: "/Applications/InjectionIII.app/Contents/Resources/macOSInjection.bundle")?.load()
-        #endif
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView()

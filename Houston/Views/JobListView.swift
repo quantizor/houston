@@ -126,11 +126,12 @@ struct JobListView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Image(systemName: "arrow.up.arrow.down")
                         Text(sortOrder.rawValue)
                     }
-                    .padding(.horizontal, 2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                 }
                 .help("Sort jobs")
             }
@@ -218,6 +219,9 @@ struct JobListView: View {
                 Divider()
 
                 Button(role: .destructive) {
+                    if !store.selectedJobIDs.contains(job.id) {
+                        store.selectedJobIDs = [job.id]
+                    }
                     store.showingDeleteConfirmation = true
                 } label: {
                     Label("Delete", systemImage: "trash")

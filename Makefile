@@ -9,25 +9,29 @@
 
 .PHONY: build
 build: ## Build HoustonKit SPM package
-	cd HoustonKit && swift build
+	cd HoustonKit && swift build 2>&1 | tail -2
 
 .PHONY: build-release
 build-release: ## Build HoustonKit in release mode
-	cd HoustonKit && swift build -c release
+	cd HoustonKit && swift build -c release 2>&1 | tail -2
 
 .PHONY: build-app
 build-app: ## Build the full Houston app via xcodebuild
-	xcodebuild -scheme Houston -configuration Debug build
+	@xcodebuild -scheme Houston -configuration Debug -destination 'platform=macOS,arch=arm64' build -quiet
 
 .PHONY: build-app-release
 build-app-release: ## Build the Houston app in release configuration
-	xcodebuild -scheme Houston -configuration Release build
+	@xcodebuild -scheme Houston -configuration Release -destination 'platform=macOS,arch=arm64' build -quiet
 
 .PHONY: install
 install: build-app-release ## Build release and copy to /Applications
-	@echo "Installing Houston to /Applications..."
+	@echo ""
+	@printf "  Installing to /Applications..."
 	@cp -R "$$(xcodebuild -scheme Houston -configuration Release -showBuildSettings 2>/dev/null | grep -m1 'BUILT_PRODUCTS_DIR' | awk '{print $$NF}')/Houston.app" /Applications/
-	@echo "Done — Houston.app installed to /Applications"
+	@echo " done."
+	@echo ""
+	@printf "  \033[1mH O U S T O N   I S   G O\033[0m\n"
+	@echo ""
 
 # ──────────────────────────────────────────────
 # Test
@@ -35,7 +39,7 @@ install: build-app-release ## Build release and copy to /Applications
 
 .PHONY: test
 test: ## Run all HoustonKit tests
-	cd HoustonKit && swift test
+	@cd HoustonKit && swift test 2>&1 | awk '/tests in .* suites/{print ""; print; next} /Suite .* passed/{next} /Test .* passed/{printf "."; next} /Test .* failed/{printf "F"; print; next} /error:/{print; next}'
 
 .PHONY: test-verbose
 test-verbose: ## Run tests with verbose output
@@ -75,8 +79,8 @@ clean: ## Clean SPM build artifacts
 
 .PHONY: clean-all
 clean-all: clean ## Clean SPM + Xcode derived data
-	xcodebuild -scheme Houston clean 2>/dev/null || true
-	rm -rf ~/Library/Developer/Xcode/DerivedData/Houston-*
+	@xcodebuild -scheme Houston clean -quiet 2>/dev/null || true
+	@rm -rf ~/Library/Developer/Xcode/DerivedData/Houston-*
 
 .PHONY: reset
 reset: ## Full reset: clean + resolve packages
