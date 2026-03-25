@@ -580,7 +580,6 @@ struct StandardTabView: View {
                     .font(.body.monospaced())
                     .help(PlistKey.lookup("WorkingDirectory")?.description ?? "")
             }
-            .disabled(job.isReadOnly)
 
             Section("Scheduling") {
                 Toggle("Run at Load", isOn: $editorVM.runAtLoad)
@@ -623,7 +622,6 @@ struct StandardTabView: View {
                     }
                 }
             }
-            .disabled(job.isReadOnly)
 
             Section("Logging") {
                 TextField("Standard Out Path", text: $editorVM.standardOutPath)
@@ -634,7 +632,6 @@ struct StandardTabView: View {
                     .font(.body.monospaced())
                     .help(PlistKey.lookup("StandardErrorPath")?.description ?? "")
             }
-            .disabled(job.isReadOnly)
 
             Section("Environment Variables") {
                 ForEach(Array(editorVM.environmentVariables.enumerated()), id: \.offset) { index, pair in
@@ -674,7 +671,6 @@ struct StandardTabView: View {
                 .buttonStyle(.borderless)
             }
             .help(PlistKey.lookup("EnvironmentVariables")?.description ?? "")
-            .disabled(job.isReadOnly)
 
             if !editorVM.validationErrors.isEmpty {
                 Section("Validation Issues") {
@@ -782,7 +778,6 @@ struct ExpertTabView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .disabled(store.selectedJob?.isReadOnly == true)
     }
 }
 
