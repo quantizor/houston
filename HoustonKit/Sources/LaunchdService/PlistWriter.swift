@@ -22,49 +22,7 @@ public struct PlistWriter: Sendable {
             dict = [:]
         }
 
-        // Merge promoted fields
-        dict["Label"] = job.label
-
-        if let programArguments = job.programArguments {
-            dict["ProgramArguments"] = programArguments
-        }
-        if let program = job.program {
-            dict["Program"] = program
-        }
-        if let runAtLoad = job.runAtLoad {
-            dict["RunAtLoad"] = runAtLoad
-        }
-        if let keepAlive = job.keepAlive {
-            dict["KeepAlive"] = keepAlive
-        }
-        if let startInterval = job.startInterval {
-            dict["StartInterval"] = startInterval
-        }
-        if let startCalendarInterval = job.startCalendarInterval {
-            dict["StartCalendarInterval"] = startCalendarInterval
-        }
-        if let standardOutPath = job.standardOutPath {
-            dict["StandardOutPath"] = standardOutPath
-        }
-        if let standardErrorPath = job.standardErrorPath {
-            dict["StandardErrorPath"] = standardErrorPath
-        }
-        if let workingDirectory = job.workingDirectory {
-            dict["WorkingDirectory"] = workingDirectory
-        }
-        if let environmentVariables = job.environmentVariables {
-            dict["EnvironmentVariables"] = environmentVariables
-        }
-        if let userName = job.userName {
-            dict["UserName"] = userName
-        }
-        if let groupName = job.groupName {
-            dict["GroupName"] = groupName
-        }
-        if let disabled = job.disabled {
-            dict["Disabled"] = disabled
-        }
-
+        mergePromotedFields(from: job, into: &dict)
         try writeDictionary(dict, to: url)
     }
 
@@ -132,53 +90,59 @@ public struct PlistWriter: Sendable {
             dict = [:]
         }
 
-        // Merge promoted fields
-        dict["Label"] = job.label
-
-        if let programArguments = job.programArguments {
-            dict["ProgramArguments"] = programArguments
-        }
-        if let program = job.program {
-            dict["Program"] = program
-        }
-        if let runAtLoad = job.runAtLoad {
-            dict["RunAtLoad"] = runAtLoad
-        }
-        if let keepAlive = job.keepAlive {
-            dict["KeepAlive"] = keepAlive
-        }
-        if let startInterval = job.startInterval {
-            dict["StartInterval"] = startInterval
-        }
-        if let startCalendarInterval = job.startCalendarInterval {
-            dict["StartCalendarInterval"] = startCalendarInterval
-        }
-        if let standardOutPath = job.standardOutPath {
-            dict["StandardOutPath"] = standardOutPath
-        }
-        if let standardErrorPath = job.standardErrorPath {
-            dict["StandardErrorPath"] = standardErrorPath
-        }
-        if let workingDirectory = job.workingDirectory {
-            dict["WorkingDirectory"] = workingDirectory
-        }
-        if let environmentVariables = job.environmentVariables {
-            dict["EnvironmentVariables"] = environmentVariables
-        }
-        if let userName = job.userName {
-            dict["UserName"] = userName
-        }
-        if let groupName = job.groupName {
-            dict["GroupName"] = groupName
-        }
-        if let disabled = job.disabled {
-            dict["Disabled"] = disabled
-        }
-
+        mergePromotedFields(from: job, into: &dict)
         return try serializeDictionary(dict)
     }
 
     // MARK: - Private
+
+    /// Merge all promoted fields from a job into a plist dictionary.
+    /// Sets values when present; removes keys when nil (so cleared fields don't linger).
+    private func mergePromotedFields(from job: LaunchdJob, into dict: inout [String: Any]) {
+        dict["Label"] = job.label
+
+        if let value = job.programArguments { dict["ProgramArguments"] = value }
+        else { dict.removeValue(forKey: "ProgramArguments") }
+
+        if let value = job.program { dict["Program"] = value }
+        else { dict.removeValue(forKey: "Program") }
+
+        if let value = job.runAtLoad { dict["RunAtLoad"] = value }
+        else { dict.removeValue(forKey: "RunAtLoad") }
+
+        if let value = job.keepAlive { dict["KeepAlive"] = value }
+        else { dict.removeValue(forKey: "KeepAlive") }
+
+        if let value = job.startInterval { dict["StartInterval"] = value }
+        else { dict.removeValue(forKey: "StartInterval") }
+
+        if let value = job.startCalendarInterval { dict["StartCalendarInterval"] = value }
+        else { dict.removeValue(forKey: "StartCalendarInterval") }
+
+        if let value = job.standardOutPath { dict["StandardOutPath"] = value }
+        else { dict.removeValue(forKey: "StandardOutPath") }
+
+        if let value = job.standardErrorPath { dict["StandardErrorPath"] = value }
+        else { dict.removeValue(forKey: "StandardErrorPath") }
+
+        if let value = job.workingDirectory { dict["WorkingDirectory"] = value }
+        else { dict.removeValue(forKey: "WorkingDirectory") }
+
+        if let value = job.environmentVariables { dict["EnvironmentVariables"] = value }
+        else { dict.removeValue(forKey: "EnvironmentVariables") }
+
+        if let value = job.userName { dict["UserName"] = value }
+        else { dict.removeValue(forKey: "UserName") }
+
+        if let value = job.groupName { dict["GroupName"] = value }
+        else { dict.removeValue(forKey: "GroupName") }
+
+        if let value = job.disabled { dict["Disabled"] = value }
+        else { dict.removeValue(forKey: "Disabled") }
+
+        if let value = job.processType { dict["ProcessType"] = value }
+        else { dict.removeValue(forKey: "ProcessType") }
+    }
 
     private func serializeDictionary(_ dict: [String: Any]) throws -> Data {
         return try PropertyListSerialization.data(

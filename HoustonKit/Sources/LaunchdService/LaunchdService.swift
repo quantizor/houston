@@ -18,7 +18,7 @@ public enum LaunchdServiceError: LocalizedError {
 
 @Observable @MainActor
 public final class LaunchdService {
-    public private(set) var jobs: [LaunchdJob] = []
+    public internal(set) var jobs: [LaunchdJob] = []
     public private(set) var isLoading: Bool = false
 
     private let executor: any LaunchctlExecuting
@@ -225,6 +225,10 @@ public final class LaunchdService {
 
     /// Delete a job: bootout if loaded, then remove the plist file.
     public func deleteJob(_ job: LaunchdJob) async throws {
+        guard !job.domain.isReadOnly else {
+            throw LaunchctlError.readOnlyDomain(job.domain.displayName)
+        }
+
         // Unload first if loaded
         if job.status.isLoaded {
             try? await unloadJob(job)
@@ -281,6 +285,10 @@ public final class LaunchdService {
 
     /// Save a job's promoted fields back to its plist file.
     public func saveJob(_ job: LaunchdJob) async throws {
+        guard !job.domain.isReadOnly else {
+            throw LaunchctlError.readOnlyDomain(job.domain.displayName)
+        }
+
         if job.domain.requiresPrivilege {
             let data = try writer.writeData(job: job)
             try await privilegedHelper.writePlist(data, toPath: job.plistURL.path)

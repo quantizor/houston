@@ -1,20 +1,55 @@
 import Foundation
 import PrivilegedHelper
 
-public struct SystemLogReader: Sendable {
+public protocol SystemLogQuerying: Sendable {
+    func query(label: String, executablePath: String?, since: Date?, limit: Int) async -> [LogEntry]
+    func query(predicate: String, since: Date?, limit: Int) async -> [LogEntry]
+}
+
+extension SystemLogQuerying {
+    public func query(label: String, executablePath: String? = nil, since: Date? = nil, limit: Int = 500) async -> [LogEntry] {
+        await query(label: label, executablePath: executablePath, since: since, limit: limit)
+    }
+    public func query(predicate: String, since: Date? = nil, limit: Int = 500) async -> [LogEntry] {
+        await query(predicate: predicate, since: since, limit: limit)
+    }
+}
+
+public struct SystemLogReader: SystemLogQuerying, Sendable {
     private let helperClient: PrivilegedHelperClient
+
+    private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     public init(helperClient: PrivilegedHelperClient = PrivilegedHelperClient()) {
         self.helperClient = helperClient
     }
 
     public func query(label: String, executablePath: String? = nil, since: Date? = nil, limit: Int = 500) async -> [LogEntry] {
-        // Match by subsystem (apps that use label as subsystem) or process name (executable basename)
-        var clauses = ["subsystem == '\(label)'"]
+        let escapedLabel = label.replacingOccurrences(of: "'", with: "\\'")
+        var clauses = ["subsystem == '\(escapedLabel)'"]
 
         if let path = executablePath {
             let processName = (path as NSString).lastPathComponent
-            clauses.append("process == '\(processName)'")
+            let escapedProcess = processName.replacingOccurrences(of: "'", with: "\\'")
+            clauses.append("process == '\(escapedProcess)'")
+            // Match by full executable path in senderImagePath (catches logs even when
+            // subsystem/process don't match the label, common for system daemons)
+            let escapedPath = path.replacingOccurrences(of: "'", with: "\\'")
+            clauses.append("senderImagePath == '\(escapedPath)'")
+        }
+
+        // Many Apple daemons log under their short name (last label component)
+        // e.g., com.apple.metadata.mds logs as process "mds"
+        let shortName = label.split(separator: ".").last.map(String.init)
+        if let shortName, shortName.count > 2 {
+            let escapedShort = shortName.replacingOccurrences(of: "'", with: "\\'")
+            if !clauses.contains(where: { $0.contains("process == '\(escapedShort)'") }) {
+                clauses.append("process == '\(escapedShort)'")
+            }
         }
 
         let predicate = clauses.joined(separator: " OR ")
@@ -88,7 +123,7 @@ public struct SystemLogReader: Sendable {
 
     // MARK: - NDJSON parsing
 
-    private func parseNDJSON(_ output: String, limit: Int) -> [LogEntry] {
+    func parseNDJSON(_ output: String, limit: Int) -> [LogEntry] {
         var entries: [LogEntry] = []
         let lines = output.components(separatedBy: "\n")
 
@@ -123,14 +158,12 @@ public struct SystemLogReader: Sendable {
         return entries
     }
 
-    private func parseTimestamp(_ str: String?) -> Date? {
+    func parseTimestamp(_ str: String?) -> Date? {
         guard let str else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: str)
+        return Self.isoFormatter.date(from: str)
     }
 
-    private func mapLogLevel(_ type: String?) -> LogEntry.LogLevel {
+    func mapLogLevel(_ type: String?) -> LogEntry.LogLevel {
         switch type?.lowercased() {
         case "debug": return .debug
         case "info": return .info

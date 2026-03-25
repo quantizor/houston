@@ -6,7 +6,7 @@ struct LogViewerView: View {
     let job: LaunchdJob
     @Environment(AppStore.self) private var store
 
-    @State private var autoScroll: Bool = true
+    @State private var autoScroll = true
 
     var body: some View {
         @Bindable var logReader = store.logReader
@@ -16,6 +16,16 @@ struct LogViewerView: View {
                 TextField("Filter", text: $logReader.filterText)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 200)
+
+                Picker("Level", selection: $logReader.minimumLevel) {
+                    ForEach(LogEntry.LogLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue.capitalized).tag(level)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 100)
+                .help("Minimum log severity level")
+                .accessibilityLabel("Minimum log level")
 
                 Spacer()
 

@@ -44,7 +44,7 @@ struct MenuBarWidget: View {
 
             Section("Quick Actions") {
                 Button {
-                    NSApplication.shared.activate(ignoringOtherApps: true)
+                    NSApplication.shared.activate()
                     if let window = NSApplication.shared.windows.first {
                         window.makeKeyAndOrderFront(nil)
                     }
@@ -62,7 +62,7 @@ struct MenuBarWidget: View {
             Divider()
 
             HStack {
-                Text("Houston v0.1.0")
+                Text("Houston v\(Bundle.main.appVersion)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

@@ -87,6 +87,14 @@ extension PlistValidator.ValidationSeverity {
     }
 }
 
+// MARK: - Bundle
+
+extension Bundle {
+    var appVersion: String {
+        object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
+}
+
 // MARK: - Reusable Components
 
 /// Capsule-shaped pill for status labels (e.g. "Disabled", "Running")
@@ -96,7 +104,7 @@ struct StatusPill: View {
 
     var body: some View {
         Text(label)
-            .font(.caption2)
+            .font(.caption)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.15), in: Capsule())
@@ -111,10 +119,27 @@ struct TagBadge: View {
 
     var body: some View {
         Text(label)
-            .font(.caption2.monospaced())
+            .font(.caption.monospaced())
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
             .foregroundStyle(color)
+    }
+}
+
+/// Adds a subtle highlight on hover with rounded rectangle background.
+struct HoverHighlight: ViewModifier {
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(isHovered ? Color.primary.opacity(0.04) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .onHover { isHovered = $0 }
+    }
+}
+
+extension View {
+    func hoverHighlight() -> some View {
+        modifier(HoverHighlight())
     }
 }

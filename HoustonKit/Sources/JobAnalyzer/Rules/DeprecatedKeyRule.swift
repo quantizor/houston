@@ -8,6 +8,10 @@ public struct DeprecatedKeyRule: AnalysisRule {
     private static let deprecatedKeys: [(key: String, replacement: String)] = [
         ("OnDemand", "KeepAlive"),
         ("ServiceIPC", "(removed — no replacement needed)"),
+        ("HopefullyExitsLast", "(removed — no replacement needed)"),
+        ("HopefullyExitsFirst", "(removed — no replacement needed)"),
+        ("Debug", "Use os_log or StandardErrorPath for debugging"),
+        ("EnableGlobbing", "(removed — globbing no longer supported)"),
     ]
 
     public init() {}

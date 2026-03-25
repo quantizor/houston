@@ -21,7 +21,7 @@ public struct LogEntry: Identifiable, Sendable {
         case systemLog
     }
 
-    public enum LogLevel: String, Comparable, Sendable {
+    public enum LogLevel: String, CaseIterable, Comparable, Sendable {
         case debug, info, notice, warning, error, fault
 
         private var severity: Int {

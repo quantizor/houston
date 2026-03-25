@@ -3,49 +3,12 @@ import Models
 import ServiceManagement
 
 /// XPC client for communicating with the privileged helper for root operations.
-public final class PrivilegedHelperClient: @unchecked Sendable {
+public final class PrivilegedHelperClient: Sendable {
     private let helperBundleID = "com.quantizor.houston.helper"
-    private var connection: NSXPCConnection?
-    private let lock = NSLock()
 
     public init() {}
 
-    // MARK: - Connection management
-
-    /// Establish a connection to the helper via XPC Mach service.
-    public func connect() throws {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if connection != nil { return }
-
-        let conn = NSXPCConnection(machServiceName: helperBundleID, options: .privileged)
-        conn.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
-
-        conn.interruptionHandler = { [weak self] in
-            self?.lock.lock()
-            self?.connection = nil
-            self?.lock.unlock()
-        }
-
-        conn.invalidationHandler = { [weak self] in
-            self?.lock.lock()
-            self?.connection = nil
-            self?.lock.unlock()
-        }
-
-        conn.resume()
-        connection = conn
-    }
-
-    /// Disconnect from the helper.
-    public func disconnect() {
-        lock.lock()
-        defer { lock.unlock() }
-
-        connection?.invalidate()
-        connection = nil
-    }
+    // MARK: - Helper management
 
     /// Install the helper using SMAppService (macOS 13+).
     public func installHelper() async throws {
@@ -63,149 +26,78 @@ public final class PrivilegedHelperClient: @unchecked Sendable {
         }
     }
 
-    // MARK: - Helper proxy
+    // MARK: - XPC session
 
-    private func getConnection() throws -> NSXPCConnection {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if connection == nil {
-            lock.unlock()
-            try connect()
-            lock.lock()
+    private func send(_ request: HelperRequest) async throws -> HelperResponse {
+        let machService = helperBundleID
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                let session = try XPCSession(
+                    machService: machService,
+                    targetQueue: nil,
+                    options: [],
+                    requirement: .isFromSameTeam(andMatchesSigningIdentifier: nil),
+                    cancellationHandler: nil
+                )
+                // Use the typed generic overload: send<Message, Reply>(_:replyHandler:)
+                // Reply is decoded automatically — no manual .decode(as:) needed
+                try session.send(request) { (result: Result<HelperResponse, any Error>) in
+                    switch result {
+                    case .success(let response):
+                        continuation.resume(returning: response)
+                    case .failure(let error):
+                        continuation.resume(throwing: PrivilegedHelperError.operationFailed(
+                            error.localizedDescription
+                        ))
+                    }
+                }
+            } catch {
+                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
+            }
         }
+    }
 
-        guard let conn = connection else {
-            throw PrivilegedHelperError.connectionFailed
+    // MARK: - Response extraction
+
+    private func unwrap<T>(_ response: HelperResponse, extract: (HelperResponse) -> T?) throws -> T {
+        if let value = extract(response) { return value }
+        if case .error(let message) = response {
+            throw PrivilegedHelperError.operationFailed(message)
         }
-
-        return conn
+        throw PrivilegedHelperError.operationFailed("Unexpected response from helper")
     }
 
     // MARK: - Operations
 
-    /// Write plist data to a path in a privileged directory.
     public func writePlist(_ data: Data, toPath path: String) async throws {
         try PathValidator.validate(path)
-
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.writePlist(data, toPath: path) { success, errorMessage in
-                if success {
-                    continuation.resume()
-                } else {
-                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
-                        errorMessage ?? "Unknown error writing plist"
-                    ))
-                }
-            }
-        }
+        let response = try await send(.writePlist(data: data, path: path))
+        try unwrap(response) { if case .success = $0 { return () } else { return nil } }
     }
 
-    /// Delete a plist at a path in a privileged directory.
     public func deletePlist(atPath path: String) async throws {
         try PathValidator.validate(path)
-
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.deletePlist(atPath: path) { success, errorMessage in
-                if success {
-                    continuation.resume()
-                } else {
-                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
-                        errorMessage ?? "Unknown error deleting plist"
-                    ))
-                }
-            }
-        }
+        let response = try await send(.deletePlist(path: path))
+        try unwrap(response) { if case .success = $0 { return () } else { return nil } }
     }
 
-    /// Execute a launchctl command via the privileged helper.
-    /// Pass `asUser` to run in a specific user's context (default: current user).
     public func executeLaunchctl(arguments: [String], asUser uid: UInt32 = UInt32(getuid())) async throws -> (stdout: String, stderr: String) {
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.executeLaunchctl(arguments: arguments, asUser: uid) { success, stdout, stderr in
-                if success {
-                    continuation.resume(returning: (stdout: stdout ?? "", stderr: stderr ?? ""))
-                } else {
-                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
-                        stderr ?? "launchctl command failed"
-                    ))
-                }
-            }
-        }
+        let response = try await send(.executeLaunchctl(arguments: arguments, uid: uid))
+        return try unwrap(response) { if case .processOutput(let o, let e) = $0 { return (o, e) } else { return nil } }
     }
 
-    /// Execute a whitelisted process via the privileged helper.
     public func executeProcess(path: String, arguments: [String]) async throws -> (stdout: String, stderr: String) {
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.executeProcess(path: path, arguments: arguments) { success, stdout, stderr in
-                if success {
-                    continuation.resume(returning: (stdout: stdout ?? "", stderr: stderr ?? ""))
-                } else {
-                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
-                        stderr ?? "Process execution failed"
-                    ))
-                }
-            }
-        }
+        let response = try await send(.executeProcess(path: path, arguments: arguments))
+        return try unwrap(response) { if case .processOutput(let o, let e) = $0 { return (o, e) } else { return nil } }
     }
 
-    /// Query system logs via the privileged helper (runs `log show` as root).
     public func querySystemLog(predicate: String, sinceInterval: Double, limit: Int = 500) async throws -> String {
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.querySystemLog(predicate: predicate, sinceInterval: sinceInterval, limit: limit) { success, stdout, stderr in
-                if success {
-                    continuation.resume(returning: stdout ?? "")
-                } else {
-                    continuation.resume(throwing: PrivilegedHelperError.operationFailed(
-                        stderr ?? "Log query failed"
-                    ))
-                }
-            }
-        }
+        let response = try await send(.querySystemLog(predicate: predicate, sinceInterval: sinceInterval, limit: limit))
+        return try unwrap(response) { if case .logOutput(let s) = $0 { return s } else { return nil } }
     }
 
-    /// Get the helper tool version.
     public func getHelperVersion() async throws -> String {
-        let conn = try getConnection()
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let helper = conn.remoteObjectProxyWithErrorHandler { error in
-                continuation.resume(throwing: PrivilegedHelperError.connectionFailed)
-            } as! HelperProtocol
-
-            helper.getVersion { version in
-                continuation.resume(returning: version)
-            }
-        }
+        let response = try await send(.getVersion)
+        return try unwrap(response) { if case .version(let v) = $0 { return v } else { return nil } }
     }
 }

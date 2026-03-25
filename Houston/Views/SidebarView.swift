@@ -68,6 +68,8 @@ struct SidebarView: View {
         case .userAgent: return "person"
         case .globalAgent: return "person.2"
         case .globalDaemon: return "gearshape.2"
+        case .systemAgent, .systemDaemon: return "lock.shield"
+        case .launchAngel: return "wand.and.stars"
         }
     }
 }

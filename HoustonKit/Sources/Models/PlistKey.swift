@@ -79,6 +79,13 @@ public struct PlistKey: Identifiable, Sendable {
         // Deprecated
         PlistKey(key: "OnDemand", type: .boolean, description: "Deprecated: use KeepAlive instead", category: .deprecated),
         PlistKey(key: "ServiceIPC", type: .boolean, description: "Deprecated: use MachServices or Sockets instead", category: .deprecated),
+
+        // Additional keys
+        PlistKey(key: "AssociatedBundleIdentifiers", type: .array, description: "Bundle identifiers associated with this job", category: .identification),
+        PlistKey(key: "EnablePressuredExit", type: .boolean, description: "Allow the system to terminate the job under memory pressure", category: .lifecycle),
+        PlistKey(key: "EnableTransactions", type: .boolean, description: "Enable transaction-based lifecycle management", category: .lifecycle),
+        PlistKey(key: "LaunchEvents", type: .dictionary, description: "Event-driven launch triggers", category: .scheduling),
+        PlistKey(key: "MaterializeDatalessFiles", type: .boolean, description: "Materialize dataless files before execution", category: .execution),
     ]
 }
 
@@ -101,4 +108,16 @@ public enum PlistKeyCategory: String, CaseIterable, Sendable {
     case resources
     case networking
     case deprecated
+}
+
+extension PlistKey {
+    /// Lookup a PlistKey by its key name. Returns nil if not found.
+    public static func lookup(_ key: String) -> PlistKey? {
+        _keysByName[key]
+    }
+
+    /// Cached dictionary for O(1) lookup by key name.
+    private static let _keysByName: [String: PlistKey] = {
+        Dictionary(uniqueKeysWithValues: allKeys.map { ($0.key, $0) })
+    }()
 }

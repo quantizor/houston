@@ -6,6 +6,7 @@ import JobAnalyzer
 import LogViewer
 import PlistEditor
 import PrivilegedHelper
+import ServiceManagement
 
 private let logger = Logger(subsystem: "com.quantizor.houston", category: "AppStore")
 
@@ -32,12 +33,30 @@ final class AppStore {
         let available = await helperClient.isHelperAvailable()
         logger.info("Helper available: \(available)")
         guard !available else { return }
+
+        // Check current registration status before attempting install
+        let service = SMAppService.daemon(plistName: "com.quantizor.houston.helper.plist")
+        let status = service.status
+        logger.info("Helper service status: \(String(describing: status))")
+
+        let approvalMessage = "Privileged helper requires approval. Open System Settings > General > Login Items and enable Houston."
+
+        if status == .requiresApproval {
+            showToast(.error, approvalMessage)
+            return
+        }
+
         do {
             try await helperClient.installHelper()
             logger.info("Helper installed successfully")
         } catch {
             logger.error("Helper install failed: \(error)")
-            showToast(.error, "Failed to install privileged helper: \(error.localizedDescription)")
+            let postStatus = service.status
+            if postStatus == .requiresApproval {
+                showToast(.error, approvalMessage)
+            } else {
+                showToast(.error, "Failed to install privileged helper. Check System Settings > General > Login Items to ensure Houston is allowed. (\(error.localizedDescription))")
+            }
         }
         #else
         logger.info("Debug build — skipping helper installation (direct Process() available)")
@@ -62,6 +81,7 @@ final class AppStore {
     // Analysis results and runtime info for the currently selected job
     var currentAnalysisResults: [AnalysisResult] = []
     var currentServiceInfo: ServiceInfo?
+    var isLoadingDetail: Bool = false
 
     enum JobFilter: String, CaseIterable, Identifiable {
         case all = "All Jobs"
@@ -110,9 +130,15 @@ final class AppStore {
             }
         }
 
-        // Filter by search
+        // Filter by search — matches label, display name, vendor, executable path, and Apple service description
         if !searchText.isEmpty {
-            result = result.filter { $0.label.localizedCaseInsensitiveContains(searchText) }
+            result = result.filter { job in
+                job.label.localizedCaseInsensitiveContains(searchText)
+                || job.displayName.localizedCaseInsensitiveContains(searchText)
+                || job.vendor.localizedCaseInsensitiveContains(searchText)
+                || (job.executablePath?.localizedCaseInsensitiveContains(searchText) ?? false)
+                || (AppleServiceInfo.description(for: job.label)?.localizedCaseInsensitiveContains(searchText) ?? false)
+            }
         }
 
         return result
@@ -268,8 +294,9 @@ final class AppStore {
         // Cancel any in-flight selection load
         selectJobTask?.cancel()
         currentServiceInfo = nil
+        isLoadingDetail = true
 
-        selectJobTask = Task {
+        let task = Task {
             // Read file data off main thread
             let plistData = await Task.detached(priority: .userInitiated) {
                 try? Data(contentsOf: job.plistURL)
@@ -285,8 +312,9 @@ final class AppStore {
             }
 
             guard !Task.isCancelled else { return }
+            isLoadingDetail = false
 
-            // Fetch runtime info and logs concurrently
+            // Fetch runtime info and logs concurrently (updates UI incrementally)
             async let serviceInfo = launchdService.fetchServiceInfo(for: job)
             async let logs: Void = logReader.loadLogs(for: job)
 
@@ -296,6 +324,7 @@ final class AppStore {
             guard !Task.isCancelled else { return }
             currentServiceInfo = info
         }
+        selectJobTask = task
     }
 
     func saveCurrentJob() async {

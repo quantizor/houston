@@ -38,8 +38,8 @@ PlistEditor       → Models, LaunchdService    # Editor view models
 1. FallbackLaunchctlExecutor — tries direct `Process()` first (correct user context), falls back to XPC helper when sandbox blocks it. Protocol-based (`LaunchctlExecuting`) for testability.
 2. @Observable state — single `AppStore` injected via `.environment()`. Fine-grained view updates.
 3. NavigationSplitView (3-column) — sidebar (domains/filters), content (job list), detail (editor).
-4. Dynamic plist I/O — `NSMutableDictionary` preserves unknown keys; promoted fields use Codable.
-5. XPC privileged helper — `HoustonHelper` embedded in app bundle, registered via `SMAppService.daemon()`. Handles launchctl, process management, and system log queries as root.
+4. Dynamic plist I/O — Swift `[String: Any]` dictionaries preserve unknown keys; promoted fields merged via `mergePromotedFields()`. Nil fields are explicitly removed.
+5. XPC privileged helper — `HoustonHelper` embedded in app bundle, registered via `SMAppService.daemon()`. Uses Swift `XPCListener`/`XPCSession` with `Codable` message enums (`HelperRequest`/`HelperResponse`). `XPCPeerRequirement.isFromSameTeam()` validates caller identity. Handles launchctl, process management, and system log queries as root.
 6. Unified log viewer — tails file-based logs (stdout/stderr from plist paths) AND queries system log via `/usr/bin/log show` NDJSON. All sources combined in one view.
 7. Debug/Release entitlements — sandbox off in Debug (direct Process() works), sandbox on in Release (XPC helper required). Helper install only attempted in Release builds.
 8. Directory monitoring — `DispatchSource` + `FSEvents` for real-time plist change detection.

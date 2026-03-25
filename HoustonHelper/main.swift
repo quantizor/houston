@@ -1,16 +1,5 @@
 import Foundation
 
-// MARK: - Helper Protocol (duplicated here since the helper is a standalone executable)
-
-@objc protocol HelperProtocol {
-    func writePlist(_ data: Data, toPath path: String, withReply reply: @escaping (Bool, String?) -> Void)
-    func deletePlist(atPath path: String, withReply reply: @escaping (Bool, String?) -> Void)
-    func executeLaunchctl(arguments: [String], asUser uid: UInt32, withReply reply: @escaping (Bool, String?, String?) -> Void)
-    func executeProcess(path: String, arguments: [String], withReply reply: @escaping (Bool, String?, String?) -> Void)
-    func querySystemLog(predicate: String, sinceInterval: Double, limit: Int, withReply reply: @escaping (Bool, String?, String?) -> Void)
-    func getVersion(withReply reply: @escaping (String) -> Void)
-}
-
 // MARK: - Path validation
 
 private let allowedDirectories = [
@@ -41,195 +30,245 @@ private let allowedExecutables: Set<String> = [
     "/bin/kill",
 ]
 
-// MARK: - HelperTool
+// MARK: - Process execution helper
 
-class HelperTool: NSObject, HelperProtocol, NSXPCListenerDelegate {
+private struct ProcessOutput {
+    let exitCode: Int32
+    let stdout: String
+    let stderr: String
+}
 
-    // MARK: NSXPCListenerDelegate
-
-    func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
-        newConnection.exportedInterface = NSXPCInterface(with: HelperProtocol.self)
-        newConnection.exportedObject = self
-        newConnection.resume()
-        return true
+private func runProcess(_ executableURL: URL, arguments: [String], qualityOfService: QualityOfService? = nil) -> ProcessOutput {
+    let process = Process()
+    process.executableURL = executableURL
+    process.arguments = arguments
+    if let qos = qualityOfService {
+        process.qualityOfService = qos
     }
 
-    // MARK: HelperProtocol
+    let stdoutPipe = Pipe()
+    let stderrPipe = Pipe()
+    process.standardOutput = stdoutPipe
+    process.standardError = stderrPipe
 
-    func writePlist(_ data: Data, toPath path: String, withReply reply: @escaping (Bool, String?) -> Void) {
-        guard isPathAllowed(path) else {
-            reply(false, "Path is not allowed: \(path)")
-            return
-        }
+    do {
+        try process.run()
+    } catch {
+        return ProcessOutput(exitCode: -1, stdout: "", stderr: "Failed to launch process: \(error.localizedDescription)")
+    }
 
-        do {
-            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
-            // Set standard permissions: owner rw, group/other read
-            try FileManager.default.setAttributes(
-                [.posixPermissions: 0o644],
-                ofItemAtPath: path
-            )
-            reply(true, nil)
-        } catch {
-            reply(false, error.localizedDescription)
+    process.waitUntilExit()
+
+    let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+    return ProcessOutput(
+        exitCode: process.terminationStatus,
+        stdout: String(data: stdoutData, encoding: .utf8) ?? "",
+        stderr: String(data: stderrData, encoding: .utf8) ?? ""
+    )
+}
+
+// MARK: - Request handler
+
+private func handleRequest(_ request: HelperRequest) -> HelperResponse {
+    switch request {
+    case .writePlist(let data, let path):
+        return handleWritePlist(data: data, path: path)
+    case .deletePlist(let path):
+        return handleDeletePlist(path: path)
+    case .executeLaunchctl(let arguments, let uid):
+        return handleExecuteLaunchctl(arguments: arguments, uid: uid)
+    case .executeProcess(let path, let arguments):
+        return handleExecuteProcess(path: path, arguments: arguments)
+    case .querySystemLog(let predicate, let sinceInterval, let limit):
+        return handleQuerySystemLog(predicate: predicate, sinceInterval: sinceInterval, limit: limit)
+    case .getVersion:
+        return handleGetVersion()
+    }
+}
+
+// MARK: - Handlers
+
+private func handleWritePlist(data: Data, path: String) -> HelperResponse {
+    guard isPathAllowed(path) else {
+        return .error("Path is not allowed: \(path)")
+    }
+
+    do {
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o644],
+            ofItemAtPath: path
+        )
+        return .success
+    } catch {
+        return .error(error.localizedDescription)
+    }
+}
+
+private func handleDeletePlist(path: String) -> HelperResponse {
+    guard isPathAllowed(path) else {
+        return .error("Path is not allowed: \(path)")
+    }
+
+    do {
+        try FileManager.default.removeItem(atPath: path)
+        return .success
+    } catch {
+        return .error(error.localizedDescription)
+    }
+}
+
+private func handleExecuteLaunchctl(arguments: [String], uid: UInt32) -> HelperResponse {
+    guard let subcommand = arguments.first, allowedSubcommands.contains(subcommand) else {
+        return .error("Disallowed or missing launchctl subcommand. Allowed: \(allowedSubcommands.sorted().joined(separator: ", "))")
+    }
+
+    // Validate plist path for bootstrap/bootout
+    if (subcommand == "bootstrap" || subcommand == "bootout") && arguments.count >= 3 {
+        let plistPath = arguments[2]
+        guard isPathAllowed(plistPath) else {
+            return .error("Path is not allowed for \(subcommand): \(plistPath)")
         }
     }
 
-    func deletePlist(atPath path: String, withReply reply: @escaping (Bool, String?) -> Void) {
-        guard isPathAllowed(path) else {
-            reply(false, "Path is not allowed: \(path)")
-            return
-        }
+    let launchctl = URL(fileURLWithPath: "/bin/launchctl")
 
-        do {
-            try FileManager.default.removeItem(atPath: path)
-            reply(true, nil)
-        } catch {
-            reply(false, error.localizedDescription)
+    // Run as the requesting user's identity so launchctl sees the correct domain.
+    // uid == 0 means run as root (system domain operations).
+    let effectiveArgs: [String]
+    let qos: QualityOfService?
+    if uid != 0 {
+        effectiveArgs = ["asuser", "\(uid)", "/bin/launchctl"] + arguments
+        qos = .userInitiated
+    } else {
+        effectiveArgs = arguments
+        qos = nil
+    }
+
+    let output = runProcess(launchctl, arguments: effectiveArgs, qualityOfService: qos)
+
+    if output.exitCode == 0 {
+        return .processOutput(stdout: output.stdout, stderr: output.stderr)
+    } else if output.exitCode == -1 {
+        return .error(output.stderr)
+    } else {
+        return .error(output.stderr.isEmpty ? "launchctl exited with status \(output.exitCode)" : output.stderr)
+    }
+}
+
+private func handleExecuteProcess(path: String, arguments: [String]) -> HelperResponse {
+    guard allowedExecutables.contains(path) else {
+        return .error("Disallowed executable: \(path). Allowed: \(allowedExecutables.sorted().joined(separator: ", "))")
+    }
+
+    // Validate arguments for /bin/kill: only allow signal + numeric PID
+    if path == "/bin/kill" {
+        let validKillArgs = arguments.allSatisfy { arg in
+            arg.hasPrefix("-") || Int(arg) != nil
+        }
+        guard validKillArgs else {
+            return .error("Invalid arguments for /bin/kill")
         }
     }
 
-    func executeLaunchctl(arguments: [String], asUser uid: UInt32, withReply reply: @escaping (Bool, String?, String?) -> Void) {
-        guard let subcommand = arguments.first, allowedSubcommands.contains(subcommand) else {
-            reply(false, nil, "Disallowed or missing launchctl subcommand. Allowed: \(allowedSubcommands.sorted().joined(separator: ", "))")
-            return
-        }
+    let output = runProcess(URL(fileURLWithPath: path), arguments: arguments)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = arguments
+    if output.exitCode == 0 {
+        return .processOutput(stdout: output.stdout, stderr: output.stderr)
+    } else if output.exitCode == -1 {
+        return .error(output.stderr)
+    } else {
+        return .error(output.stderr.isEmpty ? "Process exited with status \(output.exitCode)" : output.stderr)
+    }
+}
 
-        // Run as the requesting user's identity so launchctl sees the correct domain.
-        // uid == 0 means run as root (system domain operations).
-        if uid != 0 {
-            process.qualityOfService = .userInitiated
-            // Use launchctl's asuser wrapper: `launchctl asuser <uid> launchctl <args>`
-            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-            process.arguments = ["asuser", "\(uid)", "/bin/launchctl"] + arguments
-        }
+private func handleQuerySystemLog(predicate: String, sinceInterval: Double, limit: Int) -> HelperResponse {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
 
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
+    var args = ["show"]
+    args += ["--predicate", predicate]
 
-        do {
-            try process.run()
-        } catch {
-            reply(false, nil, "Failed to launch process: \(error.localizedDescription)")
-            return
-        }
+    let seconds = max(1, Int(sinceInterval))
+    args += ["--last", "\(seconds)s"]
 
-        process.waitUntilExit()
+    args += ["--style", "ndjson"]
+    args += ["--info", "--debug"]
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
+    process.arguments = args
 
-        if process.terminationStatus == 0 {
-            reply(true, stdoutStr, stderrStr)
-        } else {
-            reply(false, stdoutStr, stderrStr)
-        }
+    let stdoutPipe = Pipe()
+    let stderrPipe = Pipe()
+    process.standardOutput = stdoutPipe
+    process.standardError = stderrPipe
+
+    do {
+        try process.run()
+    } catch {
+        return .error("Failed to launch log process: \(error.localizedDescription)")
     }
 
-    func executeProcess(path: String, arguments: [String], withReply reply: @escaping (Bool, String?, String?) -> Void) {
-        guard allowedExecutables.contains(path) else {
-            reply(false, nil, "Disallowed executable: \(path). Allowed: \(allowedExecutables.sorted().joined(separator: ", "))")
-            return
-        }
+    // Stream output incrementally to avoid buffering huge log results
+    let fileHandle = stdoutPipe.fileHandleForReading
+    var kept: [String] = []
+    var jsonCount = 0
+    var buffer = ""
 
-        // Validate arguments for /bin/kill: only allow signal + numeric PID
-        if path == "/bin/kill" {
-            let validKillArgs = arguments.allSatisfy { arg in
-                arg.hasPrefix("-") || Int(arg) != nil
+    while true {
+        let chunk = fileHandle.readData(ofLength: 64 * 1024)
+        if chunk.isEmpty { break }
+
+        buffer += String(data: chunk, encoding: .utf8) ?? ""
+
+        // Process complete lines from buffer
+        while let newlineRange = buffer.range(of: "\n") {
+            let line = String(buffer[buffer.startIndex..<newlineRange.lowerBound])
+            buffer = String(buffer[newlineRange.upperBound...])
+
+            if limit > 0 {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed.hasPrefix("{") {
+                    jsonCount += 1
+                    if jsonCount > limit {
+                        process.terminate()
+                        return .logOutput(kept.joined(separator: "\n"))
+                    }
+                }
             }
-            guard validKillArgs else {
-                reply(false, nil, "Invalid arguments for /bin/kill")
-                return
-            }
-        }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = arguments
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            reply(false, nil, "Failed to launch process: \(error.localizedDescription)")
-            return
-        }
-
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        if process.terminationStatus == 0 {
-            reply(true, stdoutStr, stderrStr)
-        } else {
-            reply(false, stdoutStr, stderrStr)
+            kept.append(line)
         }
     }
 
-    func querySystemLog(predicate: String, sinceInterval: Double, limit: Int, withReply reply: @escaping (Bool, String?, String?) -> Void) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-
-        // Build arguments: log show --predicate '...' --last <seconds>s --style ndjson --info --debug
-        var args = ["show"]
-        args += ["--predicate", predicate]
-
-        // Convert interval to seconds for --last flag
-        let seconds = max(1, Int(sinceInterval))
-        args += ["--last", "\(seconds)s"]
-
-        args += ["--style", "ndjson"]
-        args += ["--info", "--debug"]
-
-        process.arguments = args
-
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-        } catch {
-            reply(false, nil, "Failed to launch log process: \(error.localizedDescription)")
-            return
-        }
-
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
-
-        // log show returns 0 even with no results
-        reply(true, stdoutStr, stderrStr)
+    // Process any remaining buffer content
+    if !buffer.isEmpty {
+        kept.append(buffer)
     }
 
-    func getVersion(withReply reply: @escaping (String) -> Void) {
-        reply("1.2.0")
-    }
+    process.waitUntilExit()
+    return .logOutput(kept.joined(separator: "\n"))
+}
+
+private func handleGetVersion() -> HelperResponse {
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        ?? "unknown"
+    return .version(version)
 }
 
 // MARK: - Entry point
 
-let delegate = HelperTool()
-let listener = NSXPCListener(machServiceName: "com.quantizor.houston.helper")
-listener.delegate = delegate
-listener.resume()
-RunLoop.current.run()
+let listener = try XPCListener(
+    service: "com.quantizor.houston.helper",
+    targetQueue: nil,
+    options: [],
+    requirement: .isFromSameTeam(andMatchesSigningIdentifier: nil),
+    incomingSessionHandler: { request in
+        request.accept(incomingMessageHandler: { (message: HelperRequest) -> HelperResponse? in
+            return handleRequest(message)
+        }, cancellationHandler: nil)
+    }
+)
+
+dispatchMain()

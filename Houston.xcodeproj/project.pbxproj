@@ -31,6 +31,7 @@
 		B1000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000002 /* main.swift */; };
 		B1000003 /* com.quantizor.houston.helper in Embed Daemon */ = {isa = PBXBuildFile; fileRef = B1000004 /* com.quantizor.houston.helper */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B1000005 /* com.quantizor.houston.helper.plist in Embed Daemon Plist */ = {isa = PBXBuildFile; fileRef = B1000006 /* com.quantizor.houston.helper.plist */; };
+		B1000008 /* HelperMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000009 /* HelperMessages.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +68,7 @@
 		B1000004 /* com.quantizor.houston.helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = com.quantizor.houston.helper; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000006 /* com.quantizor.houston.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = com.quantizor.houston.helper.plist; sourceTree = "<group>"; };
 		B1000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B1000009 /* HelperMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperMessages.swift; sourceTree = "<group>"; };
 		B1000061 /* HoustonHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HoustonHelper.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -161,6 +163,7 @@
 			isa = PBXGroup;
 			children = (
 				B1000002 /* main.swift */,
+				B1000009 /* HelperMessages.swift */,
 				B1000006 /* com.quantizor.houston.helper.plist */,
 				B1000007 /* Info.plist */,
 				B1000061 /* HoustonHelper.entitlements */,
@@ -311,6 +314,7 @@
 			isa = PBXSourcesBuildPhase;
 			files = (
 				B1000001 /* main.swift in Sources */,
+				B1000008 /* HelperMessages.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */
@@ -458,7 +462,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL_APP_INTENTS_METADATA = YES;
@@ -490,7 +494,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL_APP_INTENTS_METADATA = YES;
@@ -511,7 +515,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = HoustonHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston.helper;
 				PRODUCT_NAME = com.quantizor.houston.helper;
 				SKIP_INSTALL = YES;
@@ -531,7 +535,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = HoustonHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.quantizor.houston.helper;
 				PRODUCT_NAME = com.quantizor.houston.helper;
 				SKIP_INSTALL = YES;

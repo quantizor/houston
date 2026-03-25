@@ -10,22 +10,27 @@ public final class LogReader {
     public private(set) var entries: [LogEntry] = []
     public private(set) var isReading: Bool = false
     public var filterText: String = ""
+    public var minimumLevel: LogEntry.LogLevel = .debug
 
     private var stdoutReader: FileTailReader?
     private var stderrReader: FileTailReader?
-    private let systemLogReader: SystemLogReader
+    private let systemLogReader: any SystemLogQuerying
     private var currentJobLabel: String?
     private var currentExecutablePath: String?
 
     public var filteredEntries: [LogEntry] {
-        if filterText.isEmpty { return entries }
-        return entries.filter {
-            $0.message.localizedCaseInsensitiveContains(filterText)
+        entries.filter { entry in
+            entry.level >= minimumLevel
+            && (filterText.isEmpty || entry.message.localizedCaseInsensitiveContains(filterText))
         }
     }
 
     public init(helperClient: PrivilegedHelperClient = PrivilegedHelperClient()) {
         self.systemLogReader = SystemLogReader(helperClient: helperClient)
+    }
+
+    public init(systemLogReader: any SystemLogQuerying) {
+        self.systemLogReader = systemLogReader
     }
 
     public func loadLogs(for job: some LoggableJob) async {

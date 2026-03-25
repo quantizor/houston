@@ -148,8 +148,7 @@ release: ## Release: make release [patch|minor|major]
 	@git tag "v$(NEXT_VERSION)"
 	@$(MAKE) dmg VERSION=$(NEXT_VERSION)
 	@gh release create "v$(NEXT_VERSION)" "$(BUILD_DIR)/Houston-$(NEXT_VERSION)-$(ARCH).dmg" \
-		--title "Houston $(NEXT_VERSION)" \
-		--generate-notes
+		--title "Houston $(NEXT_VERSION)"
 	@printf "\n  \033[32mReleased Houston $(NEXT_VERSION)\033[0m\n\n"
 
 # Clean ────────────────────────────────────────

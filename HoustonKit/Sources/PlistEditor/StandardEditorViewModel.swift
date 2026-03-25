@@ -16,6 +16,15 @@ public final class StandardEditorViewModel {
     public var userName: String = ""
     public var disabled: Bool = false
     public var environmentVariables: [(key: String, value: String)] = []
+    public var calendarMonth: Int?
+    public var calendarDay: Int?
+    public var calendarWeekday: Int?
+    public var calendarHour: Int?
+    public var calendarMinute: Int?
+
+    public var hasCalendarInterval: Bool {
+        calendarMonth != nil || calendarDay != nil || calendarWeekday != nil || calendarHour != nil || calendarMinute != nil
+    }
 
     private var _originalDict: [String: Any]?
     private var _loaded: Bool = false
@@ -51,6 +60,7 @@ public final class StandardEditorViewModel {
         } else {
             environmentVariables = []
         }
+        loadCalendarInterval(job.startCalendarInterval)
         _loaded = true
     }
 
@@ -72,7 +82,16 @@ public final class StandardEditorViewModel {
         } else {
             environmentVariables = []
         }
+        loadCalendarInterval(dict["StartCalendarInterval"] as? [String: Int])
         _loaded = true
+    }
+
+    private func loadCalendarInterval(_ cal: [String: Int]?) {
+        calendarMonth = cal?["Month"]
+        calendarDay = cal?["Day"]
+        calendarWeekday = cal?["Weekday"]
+        calendarHour = cal?["Hour"]
+        calendarMinute = cal?["Minute"]
     }
 
     public func toDictionary(merging original: [String: Any]? = nil) -> [String: Any] {
@@ -126,6 +145,18 @@ public final class StandardEditorViewModel {
         }
 
         dict["Disabled"] = disabled
+
+        if hasCalendarInterval {
+            var cal: [String: Int] = [:]
+            if let v = calendarMonth { cal["Month"] = v }
+            if let v = calendarDay { cal["Day"] = v }
+            if let v = calendarWeekday { cal["Weekday"] = v }
+            if let v = calendarHour { cal["Hour"] = v }
+            if let v = calendarMinute { cal["Minute"] = v }
+            dict["StartCalendarInterval"] = cal
+        } else {
+            dict.removeValue(forKey: "StartCalendarInterval")
+        }
 
         if !environmentVariables.isEmpty {
             var envDict: [String: String] = [:]

@@ -35,6 +35,7 @@ public struct LaunchdJob: Identifiable, Sendable {
     public var userName: String?
     public var groupName: String?
     public var disabled: Bool?
+    public var processType: String?
 
     public init(
         label: String,
@@ -57,11 +58,26 @@ public struct LaunchdJob: Identifiable, Sendable {
     }
 
     public var displayName: String {
-        if let lastComponent = label.split(separator: ".").last {
-            return String(lastComponent)
+        let components = label.split(separator: ".")
+        guard components.count >= 2 else { return label }
+
+        let last = String(components.last!)
+        let genericSuffixes: Set<String> = ["agent", "daemon", "xpc", "helper", "server", "service", "plist"]
+        if genericSuffixes.contains(last.lowercased()), components.count >= 3 {
+            // e.g. com.apple.security.agent → "security"
+            // com.apple.distnoted.xpc.agent → "distnoted"
+            // Find the last meaningful component (skip trailing generic suffixes)
+            for i in stride(from: components.count - 1, through: 0, by: -1) {
+                let c = String(components[i])
+                if !genericSuffixes.contains(c.lowercased()) {
+                    return c
+                }
+            }
         }
-        return label
+        return last
     }
+
+    public var isReadOnly: Bool { domain.isReadOnly }
 
     /// The vendor prefix, e.g. "com.apple" from "com.apple.Spotlight".
     public var vendor: String {

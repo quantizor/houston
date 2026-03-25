@@ -93,6 +93,7 @@ struct KeyRow: View {
 
             TagBadge(label: keyInfo.type.rawValue, color: .blue)
         }
+        .hoverHighlight()
         .accessibilityElement(children: .combine)
     }
 }

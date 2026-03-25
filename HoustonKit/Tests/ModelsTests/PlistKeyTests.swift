@@ -3,9 +3,9 @@ import Testing
 
 @Suite("PlistKey Tests")
 struct PlistKeyTests {
-    @Test("allKeys is not empty and has at least 36 keys")
+    @Test("allKeys is not empty and has at least 41 keys")
     func allKeysNotEmpty() {
-        #expect(PlistKey.allKeys.count >= 36)
+        #expect(PlistKey.allKeys.count >= 41)
     }
 
     @Test("Label key is required")
@@ -38,5 +38,37 @@ struct PlistKeyTests {
     func uniqueIds() {
         let ids = PlistKey.allKeys.map(\.id)
         #expect(Set(ids).count == ids.count)
+    }
+
+    @Test("New plist keys are present")
+    func newPlistKeysExist() {
+        let keyNames = PlistKey.allKeys.map(\.key)
+        #expect(keyNames.contains("AssociatedBundleIdentifiers"))
+        #expect(keyNames.contains("EnablePressuredExit"))
+        #expect(keyNames.contains("EnableTransactions"))
+        #expect(keyNames.contains("LaunchEvents"))
+        #expect(keyNames.contains("MaterializeDatalessFiles"))
+    }
+
+    @Test("lookup returns correct key for known names")
+    func lookupKnownKeys() {
+        let label = PlistKey.lookup("Label")
+        #expect(label != nil)
+        #expect(label?.key == "Label")
+        #expect(label?.required == true)
+
+        let program = PlistKey.lookup("Program")
+        #expect(program != nil)
+        #expect(program?.category == .execution)
+
+        let startInterval = PlistKey.lookup("StartInterval")
+        #expect(startInterval != nil)
+        #expect(startInterval?.type == .integer)
+    }
+
+    @Test("lookup returns nil for unknown key")
+    func lookupUnknownKey() {
+        #expect(PlistKey.lookup("NonExistentKey") == nil)
+        #expect(PlistKey.lookup("") == nil)
     }
 }

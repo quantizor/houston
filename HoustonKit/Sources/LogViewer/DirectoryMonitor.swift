@@ -20,7 +20,7 @@ public final class DirectoryMonitor: Sendable {
 
         let dispatchSource = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
-            eventMask: .write,
+            eventMask: [.write, .delete, .rename, .attrib],
             queue: DispatchQueue.global(qos: .utility)
         )
 

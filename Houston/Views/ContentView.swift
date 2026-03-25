@@ -23,6 +23,7 @@ struct ContentView: View {
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+                .buttonStyle(.glass)
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(store.isLoading)
             }
@@ -49,6 +50,11 @@ struct ContentView: View {
             }
         }
         .toast(store.currentToast)
+        .onKeyPress(.escape) {
+            guard !store.selectedJobIDs.isEmpty else { return .ignored }
+            store.selectedJobIDs = []
+            return .handled
+        }
     }
 }
 

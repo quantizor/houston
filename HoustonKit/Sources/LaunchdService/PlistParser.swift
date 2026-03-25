@@ -36,6 +36,7 @@ public struct PlistParser: Sendable {
         job.userName = dict["UserName"] as? String
         job.groupName = dict["GroupName"] as? String
         job.disabled = dict["Disabled"] as? Bool
+        job.processType = dict["ProcessType"] as? String
 
         if let calendarInterval = dict["StartCalendarInterval"] as? [String: Int] {
             job.startCalendarInterval = calendarInterval

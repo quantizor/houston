@@ -57,6 +57,54 @@ struct DeprecatedKeyRuleTests {
         let results = rule.analyze(job: job, plistContents: plist)
         #expect(results.isEmpty)
     }
+
+    @Test("Flags HopefullyExitsLast key")
+    func flagsHopefullyExitsLast() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "HopefullyExitsLast": true,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.key == "HopefullyExitsLast")
+    }
+
+    @Test("Flags HopefullyExitsFirst key")
+    func flagsHopefullyExitsFirst() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "HopefullyExitsFirst": true,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.key == "HopefullyExitsFirst")
+    }
+
+    @Test("Flags Debug key")
+    func flagsDebug() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Debug": true,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.key == "Debug")
+    }
+
+    @Test("Flags EnableGlobbing key")
+    func flagsEnableGlobbing() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "EnableGlobbing": true,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.key == "EnableGlobbing")
+    }
 }
 
 // MARK: - ConflictingKeysRule Tests
@@ -374,5 +422,341 @@ struct MissingExecutableRuleTests {
         ]
         let results = rule.analyze(job: job, plistContents: plist)
         #expect(results.isEmpty)
+    }
+}
+
+// MARK: - CleanupRule Tests
+
+@Suite("CleanupRule Tests")
+struct CleanupRuleTests {
+    let rule = CleanupRule()
+
+    @Test("Flags empty plist for cleanup")
+    func emptyPlist() {
+        let job = makeJob()
+        let plist: [String: Any] = [:]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.severity == .info)
+        #expect(results.first?.title == "Recommended for cleanup")
+        #expect(results.first?.description.contains("empty") == true)
+    }
+
+    @Test("Flags plist with no executable, no MachServices, no Sockets")
+    func noExecutableNoServices() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "RunAtLoad": true,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.description.contains("No executable") == true)
+    }
+
+    @Test("Does not flag plist with MachServices")
+    func hasMachServices() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "MachServices": ["com.example.service": true],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.isEmpty)
+    }
+
+    @Test("Does not flag plist with Sockets")
+    func hasSockets() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Sockets": ["Listeners": ["SockServiceName": "ssh"]],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.isEmpty)
+    }
+
+    @Test("Does not flag plist with valid ProgramArguments")
+    func hasValidProgramArguments() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/echo", "hello"],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        // Should not flag no-executable since ProgramArguments is present
+        let noExecResults = results.filter { $0.description.contains("No executable") }
+        #expect(noExecResults.isEmpty)
+    }
+
+    @Test("Does not flag plist with Program key")
+    func hasProgramKey() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/usr/bin/true",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let noExecResults = results.filter { $0.description.contains("No executable") }
+        #expect(noExecResults.isEmpty)
+    }
+
+    @Test("Flags orphaned executable when not loaded and not system path")
+    func orphanedExecutable() {
+        var job = makeJob()
+        job.status = .unloaded
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/opt/nonexistent-app-\(UUID().uuidString)/binary",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.count == 1)
+        #expect(orphanResults.first?.severity == .info)
+    }
+
+    @Test("Does not flag missing executable on system path")
+    func systemPathExecutable() {
+        var job = makeJob()
+        job.status = .unloaded
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/usr/libexec/somebinary",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.isEmpty)
+    }
+
+    @Test("Does not flag missing executable when job is loaded")
+    func loadedJobMissingExec() {
+        var job = makeJob()
+        job.status = .loaded(lastExitCode: 0)
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/opt/nonexistent-app-\(UUID().uuidString)/binary",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.isEmpty)
+    }
+
+    @Test("Does not flag missing executable in system frameworks path")
+    func systemFrameworkPath() {
+        var job = makeJob()
+        job.status = .unloaded
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/System/Library/Frameworks/SomeFramework.framework/binary",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.isEmpty)
+    }
+
+    @Test("Does not flag missing executable in CoreServices path")
+    func coreServicesPath() {
+        var job = makeJob()
+        job.status = .unloaded
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/System/Library/CoreServices/SomeService",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.isEmpty)
+    }
+
+    @Test("Orphan check uses ProgramArguments first element when no Program key")
+    func orphanedViaProgramArguments() {
+        var job = makeJob()
+        job.status = .unloaded
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/opt/nonexistent-app-\(UUID().uuidString)/binary", "--flag"],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let orphanResults = results.filter { $0.description.contains("missing") }
+        #expect(orphanResults.count == 1)
+    }
+}
+
+// MARK: - PermissionRule Tests
+
+@Suite("PermissionRule Tests")
+struct PermissionRuleTests {
+    let rule = PermissionRule()
+
+    @Test("No results when executable exists and is executable")
+    func executableExists() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/bin/echo",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let execResults = results.filter { $0.title.contains("executable") }
+        #expect(execResults.isEmpty)
+    }
+
+    @Test("No results when executable does not exist on disk")
+    func executableMissing() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": "/nonexistent/path/binary",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        // PermissionRule only flags files that exist but lack +x
+        #expect(results.isEmpty)
+    }
+
+    @Test("No results when no executable specified")
+    func noExecutable() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.isEmpty)
+    }
+
+    @Test("Uses ProgramArguments first element when no Program key")
+    func programArgumentsFallback() {
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": ["/bin/echo", "hello"],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let execResults = results.filter { $0.title.contains("executable") }
+        #expect(execResults.isEmpty)
+    }
+
+    @Test("Flags non-executable file via Program key")
+    func nonExecutableViaProgram() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+        let scriptURL = tmpDir.appendingPathComponent("test-noexec-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: scriptURL) }
+
+        // Create a file without execute permission
+        try "hello".write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: scriptURL.path)
+
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "Program": scriptURL.path,
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.severity == .warning)
+        #expect(results.first?.title.contains("not marked as executable") == true)
+        #expect(results.first?.key == "Program")
+    }
+
+    @Test("Flags non-executable file via ProgramArguments")
+    func nonExecutableViaProgramArguments() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+        let scriptURL = tmpDir.appendingPathComponent("test-noexec-args-\(UUID().uuidString).txt")
+        defer { try? FileManager.default.removeItem(at: scriptURL) }
+
+        try "hello".write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: scriptURL.path)
+
+        let job = makeJob()
+        let plist: [String: Any] = [
+            "Label": "com.example.test",
+            "ProgramArguments": [scriptURL.path, "--flag"],
+        ]
+        let results = rule.analyze(job: job, plistContents: plist)
+        #expect(results.count == 1)
+        #expect(results.first?.key == "ProgramArguments")
+        #expect(results.first?.suggestion?.contains("chmod") == true)
+    }
+
+    @Test("Plist readability check passes for readable file")
+    func plistReadable() {
+        // The default makeJob uses /tmp/<filename> which doesn't exist,
+        // so no plist readability warning is produced
+        let job = makeJob()
+        let plist: [String: Any] = ["Label": "com.example.test"]
+        let results = rule.analyze(job: job, plistContents: plist)
+        let readResults = results.filter { $0.title.contains("readable") }
+        #expect(readResults.isEmpty)
+    }
+}
+
+// MARK: - AnalysisResult Tests
+
+@Suite("AnalysisResult Tests")
+struct AnalysisResultTests {
+    @Test("AnalysisResult stores all properties")
+    func storesAllProperties() {
+        let result = AnalysisResult(
+            severity: .error,
+            title: "Test Title",
+            description: "Test Description",
+            key: "TestKey",
+            suggestion: "Fix it"
+        )
+        #expect(result.severity == .error)
+        #expect(result.title == "Test Title")
+        #expect(result.description == "Test Description")
+        #expect(result.key == "TestKey")
+        #expect(result.suggestion == "Fix it")
+    }
+
+    @Test("AnalysisResult has unique id")
+    func uniqueId() {
+        let a = AnalysisResult(severity: .info, title: "A", description: "A")
+        let b = AnalysisResult(severity: .info, title: "A", description: "A")
+        #expect(a.id != b.id)
+    }
+
+    @Test("AnalysisResult key and suggestion default to nil")
+    func defaultNilOptionals() {
+        let result = AnalysisResult(severity: .warning, title: "T", description: "D")
+        #expect(result.key == nil)
+        #expect(result.suggestion == nil)
+    }
+
+    @Test("Severity comparison: info < warning < error")
+    func severityOrdering() {
+        #expect(AnalysisResult.Severity.info < .warning)
+        #expect(AnalysisResult.Severity.warning < .error)
+        #expect(AnalysisResult.Severity.info < .error)
+        #expect(!(AnalysisResult.Severity.error < .info))
+        #expect(!(AnalysisResult.Severity.warning < .info))
+        #expect(!(AnalysisResult.Severity.error < .warning))
+    }
+
+    @Test("Severity equal values are not less than each other")
+    func severityEqualNotLess() {
+        #expect(!(AnalysisResult.Severity.info < .info))
+        #expect(!(AnalysisResult.Severity.warning < .warning))
+        #expect(!(AnalysisResult.Severity.error < .error))
+    }
+
+    @Test("Severity rawValue strings")
+    func severityRawValues() {
+        #expect(AnalysisResult.Severity.error.rawValue == "error")
+        #expect(AnalysisResult.Severity.warning.rawValue == "warning")
+        #expect(AnalysisResult.Severity.info.rawValue == "info")
+    }
+
+    @Test("Severity CaseIterable contains all cases")
+    func severityAllCases() {
+        #expect(AnalysisResult.Severity.allCases.count == 3)
+        #expect(AnalysisResult.Severity.allCases.contains(.error))
+        #expect(AnalysisResult.Severity.allCases.contains(.warning))
+        #expect(AnalysisResult.Severity.allCases.contains(.info))
+    }
+
+    @Test("Severity Comparable allows sorting")
+    func severitySorting() {
+        let severities: [AnalysisResult.Severity] = [.error, .info, .warning]
+        let sorted = severities.sorted()
+        #expect(sorted == [.info, .warning, .error])
     }
 }

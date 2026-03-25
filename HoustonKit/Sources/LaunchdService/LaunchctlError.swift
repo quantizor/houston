@@ -9,6 +9,7 @@ public enum LaunchctlError: Error, Sendable, LocalizedError {
     case plistWriteFailed(URL, String)
     case domainDirectoryNotFound(String)
     case jobNotFound(String)
+    case readOnlyDomain(String)
 
     public var errorDescription: String? {
         switch self {
@@ -28,6 +29,8 @@ public enum LaunchctlError: Error, Sendable, LocalizedError {
             return "Domain directory not found: \(path)"
         case .jobNotFound(let label):
             return "Job not found: \(label)"
+        case .readOnlyDomain(let domain):
+            return "Cannot modify jobs in read-only domain: \(domain)"
         }
     }
 }

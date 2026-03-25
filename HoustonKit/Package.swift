@@ -1,11 +1,11 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 
 import PackageDescription
 
 let package = Package(
     name: "HoustonKit",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     products: [
         .library(name: "Models", targets: ["Models"]),
@@ -21,11 +21,6 @@ let package = Package(
         .target(
             name: "Models",
             dependencies: []
-        ),
-        .target(
-            name: "CAuthHelper",
-            dependencies: [],
-            linkerSettings: [.linkedFramework("Security")]
         ),
         .target(
             name: "LaunchdService",

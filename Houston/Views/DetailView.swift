@@ -49,13 +49,31 @@ struct DetailView: View {
                     Divider()
 
                     // Tab content
-                    switch selectedTab {
-                    case .standard:
-                        StandardTabView(job: job)
-                    case .expert:
-                        ExpertTabView()
-                    case .xml:
-                        XMLTabView()
+                    Group {
+                        switch selectedTab {
+                        case .standard:
+                            StandardTabView(job: job)
+                        case .expert:
+                            ExpertTabView()
+                        case .xml:
+                            XMLTabView()
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+
+                    if job.isReadOnly {
+                        Divider()
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption2)
+                            Text("This is a system service and cannot be modified")
+                                .font(.caption)
+                            Spacer()
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(.quaternary.opacity(0.3))
                     }
                 }
             }
@@ -69,18 +87,25 @@ struct DetailView: View {
                 }
                 .background(.background)
             } else if store.selectedJob == nil {
-                ContentUnavailableView {
-                    Label("No Selection", systemImage: "cursorarrow.click.2")
-                } description: {
-                    Text("Select a job from the list to view its details.")
-                }
-                .background(.background)
+                DashboardView()
+                    .background(.background)
             }
         }
         .toolbar {
             if let job = store.selectedJob {
                 ToolbarItemGroup(placement: .automatic) {
-                    quickActionButtons(for: job)
+                    Group {
+                        quickActionButtons(for: job)
+
+                        Button {
+                            NSWorkspace.shared.selectFile(job.plistURL.path, inFileViewerRootedAtPath: "")
+                        } label: {
+                            Label("Reveal in Finder", systemImage: "folder")
+                        }
+                        .buttonStyle(.glass)
+                        .help("Reveal plist in Finder")
+                    }
+                    .labelStyle(.iconOnly)
                 }
             }
         }
@@ -88,69 +113,79 @@ struct DetailView: View {
 
     @ViewBuilder
     private func quickActionButtons(for job: LaunchdJob) -> some View {
-        if job.status.isRunning {
-            Button {
-                Task { await store.unloadJob(job) }
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
-            }
-            .help("Stop this job")
+        if !job.isReadOnly {
+            if job.status.isRunning {
+                Button {
+                    Task { await store.unloadJob(job) }
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .help("Stop this job")
+                .buttonStyle(.glassProminent)
 
-            Button(role: .destructive) {
-                Task { await store.forceKillJob(job) }
-            } label: {
-                Label("Force Kill", systemImage: "xmark.octagon")
+                Button(role: .destructive) {
+                    Task { await store.forceKillJob(job) }
+                } label: {
+                    Label("Force Kill", systemImage: "xmark.octagon")
+                }
+                .help("Force kill (SIGKILL)")
+                .buttonStyle(.glass)
+            } else {
+                Button {
+                    Task { await store.startJob(job) }
+                } label: {
+                    Label("Start", systemImage: "play.fill")
+                }
+                .help("Start this job")
+                .buttonStyle(.glass)
             }
-            .help("Force kill (SIGKILL)")
-        } else {
-            Button {
-                Task { await store.startJob(job) }
-            } label: {
-                Label("Start", systemImage: "play.fill")
-            }
-            .help("Start this job")
-        }
 
-        if job.isEnabled {
-            Button {
-                Task { await store.disableJob(job) }
-            } label: {
-                Label("Disable", systemImage: "pause.circle")
+            if job.isEnabled {
+                Button {
+                    Task { await store.disableJob(job) }
+                } label: {
+                    Label("Disable", systemImage: "pause.circle")
+                }
+                .help("Disable this job")
+                .buttonStyle(.glass)
+            } else {
+                Button {
+                    Task { await store.enableJob(job) }
+                } label: {
+                    Label("Enable", systemImage: "play.circle")
+                }
+                .help("Enable this job")
+                .buttonStyle(.glass)
             }
-            .help("Disable this job")
-        } else {
-            Button {
-                Task { await store.enableJob(job) }
-            } label: {
-                Label("Enable", systemImage: "play.circle")
-            }
-            .help("Enable this job")
-        }
 
-        if job.status.isLoaded {
-            Button {
-                Task { await store.unloadJob(job) }
-            } label: {
-                Label("Unload", systemImage: "eject")
+            if job.status.isLoaded {
+                Button {
+                    Task { await store.unloadJob(job) }
+                } label: {
+                    Label("Unload", systemImage: "eject")
+                }
+                .help("Unload this job")
+                .buttonStyle(.glass)
+            } else {
+                Button {
+                    Task { await store.loadJob(job) }
+                } label: {
+                    Label("Load", systemImage: "square.and.arrow.down")
+                }
+                .help("Load this job")
+                .buttonStyle(.glass)
             }
-            .help("Unload this job")
-        } else {
-            Button {
-                Task { await store.loadJob(job) }
-            } label: {
-                Label("Load", systemImage: "square.and.arrow.down")
-            }
-            .help("Load this job")
-        }
 
-        Button {
-            store.selectedJobIDs = [job.id]
-            store.showingDeleteConfirmation = true
-        } label: {
-            Label("Delete", systemImage: "trash")
-                .foregroundStyle(.red)
+            Button {
+                store.selectedJobIDs = [job.id]
+                store.showingDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .foregroundStyle(.red)
+            }
+            .help("Delete this job")
+            .buttonStyle(.glass)
         }
-        .help("Delete this job")
     }
 }
 
@@ -184,9 +219,15 @@ struct JobStatusHeader: View {
                 }
 
                 if case .loaded(let exitCode) = job.status, let exitCode {
-                    Text("Exit \(exitCode)")
-                        .font(.caption.monospaced())
-                        .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
+                    HStack(spacing: 4) {
+                        Text("Exit \(exitCode)")
+                            .font(.caption.monospaced())
+                        if exitCode != 0, let explanation = ExitCodeInfo.explanation(for: exitCode) {
+                            Text("— \(explanation)")
+                                .font(.caption)
+                        }
+                    }
+                    .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
                 }
 
                 if case .error(let message) = job.status {
@@ -227,22 +268,58 @@ struct JobStatusHeader: View {
                 }
             }
 
+            // Diagnostic summary
+            if let diagnosis = JobDiagnostic.diagnose(
+                job: job,
+                serviceInfo: info,
+                analysisResults: store.currentAnalysisResults
+            ) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption2)
+                    Text(diagnosis)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.top, 4)
+            }
+
             // Runtime details row
             HStack(spacing: 16) {
-                statusDetail(label: "Runs", value: info?.runs.map { "\($0)" } ?? "–")
+                if store.isLoadingDetail {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading details...")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    statusDetail(label: "Runs", value: info?.runs.map { "\($0)" } ?? "–")
 
-                if case .running = job.status {
-                    statusDetail(label: "Up", value: info?.processStartTime.map { uptimeString(since: $0) } ?? "–")
+                    if case .running = job.status {
+                        statusDetail(label: "Up", value: info?.processStartTime.map { uptimeString(since: $0) } ?? "–")
+                    }
+
+                    statusDetail(label: "Last Exit", value: info?.lastExitReason ?? "–")
+                    statusDetail(label: "Spawn", value: info?.spawnType ?? "–")
+
+                    if let activeCount = info?.activeCount, activeCount > 0 {
+                        statusDetail(label: "Active", value: "\(activeCount)")
+                    }
+                    if let forks = info?.forks {
+                        statusDetail(label: "Forks", value: "\(forks)")
+                    }
+                    if let execs = info?.execs {
+                        statusDetail(label: "Execs", value: "\(execs)")
+                    }
+
+                    let syslogCount = store.logReader.entries.filter { $0.source == .systemLog }.count
+                    let errorCount = store.logReader.entries.filter { $0.level == .error || $0.level == .fault }.count
+                    statusDetail(label: "Logs", value: syslogCount > 0
+                        ? (errorCount > 0 ? "\(syslogCount) (\(errorCount) errors)" : "\(syslogCount)")
+                        : "–")
                 }
-
-                statusDetail(label: "Last Exit", value: info?.lastExitReason ?? "–")
-                statusDetail(label: "Spawn", value: info?.spawnType ?? "–")
-
-                let syslogCount = store.logReader.entries.filter { $0.source == .systemLog }.count
-                let errorCount = store.logReader.entries.filter { $0.level == .error || $0.level == .fault }.count
-                statusDetail(label: "Logs", value: syslogCount > 0
-                    ? (errorCount > 0 ? "\(syslogCount) (\(errorCount) errors)" : "\(syslogCount)")
-                    : "–")
 
                 Spacer()
             }
@@ -336,15 +413,16 @@ struct LogPreview: View {
                             Image(systemName: "doc.on.doc")
                                 .font(.caption2)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
                         .help("Copy visible logs")
                     }
                 }
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 5)
+                .hoverHighlight()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
 
             if isExpanded {
                 if recentEntries.isEmpty {
@@ -449,10 +527,19 @@ struct StandardTabView: View {
         Form {
             Section("Identity") {
                 LabeledContent("Label") {
-                    Text(job.label)
-                        .font(.body.monospaced())
-                        .textSelection(.enabled)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(job.label)
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+
+                        if let description = AppleServiceInfo.description(for: job.label) {
+                            Text(description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
+                .help(PlistKey.lookup("Label")?.description ?? "")
 
                 LabeledContent("Domain") {
                     Text(job.domain.displayName)
@@ -471,6 +558,7 @@ struct StandardTabView: View {
             Section("Execution") {
                 TextField("Program", text: $editorVM.program)
                     .font(.body.monospaced())
+                    .help(PlistKey.lookup("Program")?.description ?? "")
 
                 LabeledContent("Arguments") {
                     VStack(alignment: .leading, spacing: 4) {
@@ -486,26 +574,107 @@ struct StandardTabView: View {
                         }
                     }
                 }
+                .help(PlistKey.lookup("ProgramArguments")?.description ?? "")
 
                 TextField("Working Directory", text: $editorVM.workingDirectory)
                     .font(.body.monospaced())
+                    .help(PlistKey.lookup("WorkingDirectory")?.description ?? "")
             }
+            .disabled(job.isReadOnly)
 
             Section("Scheduling") {
                 Toggle("Run at Load", isOn: $editorVM.runAtLoad)
+                    .help(PlistKey.lookup("RunAtLoad")?.description ?? "")
 
                 Toggle("Keep Alive", isOn: $editorVM.keepAlive)
+                    .help(PlistKey.lookup("KeepAlive")?.description ?? "")
 
                 TextField("Start Interval (seconds)", value: $editorVM.startInterval, format: .number)
+                    .help(PlistKey.lookup("StartInterval")?.description ?? "")
+
+                DisclosureGroup("Calendar Interval") {
+                    calendarIntervalField("Month (1–12)", value: $editorVM.calendarMonth)
+                    calendarIntervalField("Day (1–31)", value: $editorVM.calendarDay)
+                    calendarIntervalField("Weekday (0–7, 0=Sun)", value: $editorVM.calendarWeekday)
+                    calendarIntervalField("Hour (0–23)", value: $editorVM.calendarHour)
+                    calendarIntervalField("Minute (0–59)", value: $editorVM.calendarMinute)
+                }
+                .help(PlistKey.lookup("StartCalendarInterval")?.description ?? "")
+
+                // Schedule preview — surfaces ScheduleInfo for any job with scheduling configured
+                if let scheduleDesc = ScheduleInfo.description(
+                    startInterval: job.startInterval,
+                    startCalendarInterval: job.startCalendarInterval
+                ) {
+                    LabeledContent("Schedule") {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(scheduleDesc)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                            if let nextRun = ScheduleInfo.nextRunString(
+                                startInterval: job.startInterval,
+                                startCalendarInterval: job.startCalendarInterval
+                            ) {
+                                Text(nextRun)
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                    }
+                }
             }
+            .disabled(job.isReadOnly)
 
             Section("Logging") {
                 TextField("Standard Out Path", text: $editorVM.standardOutPath)
                     .font(.body.monospaced())
+                    .help(PlistKey.lookup("StandardOutPath")?.description ?? "")
 
                 TextField("Standard Error Path", text: $editorVM.standardErrorPath)
                     .font(.body.monospaced())
+                    .help(PlistKey.lookup("StandardErrorPath")?.description ?? "")
             }
+            .disabled(job.isReadOnly)
+
+            Section("Environment Variables") {
+                ForEach(Array(editorVM.environmentVariables.enumerated()), id: \.offset) { index, pair in
+                    HStack(spacing: 8) {
+                        TextField("Key", text: Binding(
+                            get: { editorVM.environmentVariables[index].key },
+                            set: { editorVM.environmentVariables[index].key = $0 }
+                        ))
+                        .font(.body.monospaced())
+                        .frame(maxWidth: 200)
+
+                        Text("=")
+                            .foregroundStyle(.tertiary)
+
+                        TextField("Value", text: Binding(
+                            get: { editorVM.environmentVariables[index].value },
+                            set: { editorVM.environmentVariables[index].value = $0 }
+                        ))
+                        .font(.body.monospaced())
+
+                        Button(role: .destructive) {
+                            editorVM.environmentVariables.remove(at: index)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Remove variable")
+                    }
+                }
+
+                Button {
+                    editorVM.environmentVariables.append((key: "", value: ""))
+                } label: {
+                    Label("Add Variable", systemImage: "plus.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
+            .help(PlistKey.lookup("EnvironmentVariables")?.description ?? "")
+            .disabled(job.isReadOnly)
 
             if !editorVM.validationErrors.isEmpty {
                 Section("Validation Issues") {
@@ -528,6 +697,18 @@ struct StandardTabView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.visible)
+    }
+
+    private func calendarIntervalField(_ label: String, value: Binding<Int?>) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            TextField("–", value: value, format: .number)
+                .font(.body.monospaced())
+                .frame(width: 60)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 
@@ -588,7 +769,7 @@ struct ExpertTabView: View {
                         Label("Add Key", systemImage: "plus.circle")
                             .font(.caption)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
                     .foregroundStyle(.blue)
                 }
                 .listStyle(.inset)
@@ -601,6 +782,7 @@ struct ExpertTabView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .disabled(store.selectedJob?.isReadOnly == true)
     }
 }
 
@@ -672,6 +854,7 @@ struct PlistNodeRow: View {
             Spacer()
         }
         .padding(.vertical, 3)
+        .help(PlistKey.lookup(node.key)?.description ?? "")
         .contextMenu {
             Button("Copy Key") {
                 NSPasteboard.general.clearContents()
@@ -744,7 +927,10 @@ struct XMLTabView: View {
                 Divider()
             }
 
-            SyntaxHighlightingTextEditor(text: $xmlEditor.xmlText)
+            SyntaxHighlightingTextEditor(
+                text: $xmlEditor.xmlText,
+                isEditable: store.selectedJob?.isReadOnly != true
+            )
         }
     }
 }
@@ -753,6 +939,7 @@ struct XMLTabView: View {
 
 struct SyntaxHighlightingTextEditor: NSViewRepresentable {
     @Binding var text: String
+    var isEditable: Bool = true
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -771,6 +958,7 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
         textView.allowsUndo = true
         textView.usesFindBar = true
         textView.textContainerInset = NSSize(width: 8, height: 8)
+        textView.isEditable = isEditable
         textView.delegate = context.coordinator
         textView.setAccessibilityLabel("XML plist editor")
 
@@ -783,6 +971,7 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         let textView = nsView.documentView as! NSTextView
+        textView.isEditable = isEditable
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
@@ -814,14 +1003,12 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
 
             let text = storage.string
             let fullRange = NSRange(location: 0, length: (text as NSString).length)
-            let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-
             // Base style
             storage.beginEditing()
             storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: fullRange)
             storage.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular), range: fullRange)
 
-            let colors = XMLSyntaxColors(isDark: isDark)
+            let colors = XMLSyntaxColors()
 
             // XML comments: <!-- ... -->
             highlight(storage, pattern: "<!--[\\s\\S]*?-->", color: colors.comment, in: text)
@@ -855,29 +1042,157 @@ struct SyntaxHighlightingTextEditor: NSViewRepresentable {
 }
 
 private struct XMLSyntaxColors {
-    let tag: NSColor
-    let attribute: NSColor
-    let string: NSColor
-    let comment: NSColor
-    let declaration: NSColor
-    let bracket: NSColor
+    let tag = NSColor.systemBlue
+    let attribute = NSColor.systemCyan
+    let string = NSColor.systemRed
+    let comment = NSColor.systemGreen
+    let declaration = NSColor.systemPurple
+    let bracket = NSColor.secondaryLabelColor
+}
 
-    init(isDark: Bool) {
-        if isDark {
-            tag = NSColor(red: 0.47, green: 0.67, blue: 0.98, alpha: 1)        // blue
-            attribute = NSColor(red: 0.59, green: 0.84, blue: 0.99, alpha: 1)   // light blue
-            string = NSColor(red: 0.95, green: 0.54, blue: 0.46, alpha: 1)      // salmon
-            comment = NSColor(red: 0.42, green: 0.48, blue: 0.38, alpha: 1)     // muted green
-            declaration = NSColor(red: 0.68, green: 0.51, blue: 0.78, alpha: 1) // purple
-            bracket = NSColor.secondaryLabelColor
-        } else {
-            tag = NSColor(red: 0.11, green: 0.28, blue: 0.65, alpha: 1)         // dark blue
-            attribute = NSColor(red: 0.30, green: 0.45, blue: 0.65, alpha: 1)   // steel blue
-            string = NSColor(red: 0.77, green: 0.10, blue: 0.09, alpha: 1)      // red
-            comment = NSColor(red: 0.33, green: 0.42, blue: 0.19, alpha: 1)     // olive green
-            declaration = NSColor(red: 0.44, green: 0.22, blue: 0.58, alpha: 1) // purple
-            bracket = NSColor.secondaryLabelColor
+// MARK: - Dashboard (shown when no job is selected)
+
+struct DashboardView: View {
+    @Environment(AppStore.self) private var store
+
+    private struct DashboardStats {
+        var troubleJobs: [LaunchdJob] = []
+        var runningCount = 0
+        var total = 0
+
+        var summaryText: String {
+            if total == 0 { return "No jobs loaded" }
+            if troubleJobs.isEmpty { return "\(runningCount) running, all healthy" }
+            let c = troubleJobs.count
+            return "\(c) \(c == 1 ? "job needs" : "jobs need") attention"
         }
+
+        var summaryColor: Color {
+            if total == 0 { return .secondary }
+            return troubleJobs.isEmpty ? .green : .orange
+        }
+    }
+
+    /// Exit codes that are normal for on-demand services (not user-actionable).
+    private static let normalExitCodes: Set<Int> = [
+        -9,   // SIGKILL — macOS kills idle on-demand agents
+        -15,  // SIGTERM — clean shutdown by launchd
+        -2,   // SIGINT — interrupted (normal during logout/restart)
+    ]
+
+    private var stats: DashboardStats {
+        var s = DashboardStats()
+        s.total = store.jobs.count
+        for job in store.jobs {
+            switch job.status {
+            case .running:
+                s.runningCount += 1
+            case .loaded(let code) where code != nil && code != 0:
+                // Skip read-only system jobs with normal exit codes — user can't act on them
+                if job.isReadOnly, let c = code, Self.normalExitCodes.contains(c) { continue }
+                s.troubleJobs.append(job)
+            case .error:
+                if job.isReadOnly { continue }
+                s.troubleJobs.append(job)
+            default: break
+            }
+        }
+        s.troubleJobs.sort { $0.label < $1.label }
+        return s
+    }
+
+    var body: some View {
+        let stats = stats
+
+        VStack(spacing: 0) {
+            Spacer()
+
+            // Health summary
+            VStack(spacing: 12) {
+                Image(systemName: stats.troubleJobs.isEmpty ? "checkmark.circle" : "exclamationmark.triangle")
+                    .font(.system(size: 36))
+                    .foregroundStyle(stats.summaryColor)
+
+                Text(stats.summaryText)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(stats.summaryColor)
+            }
+            .padding(.bottom, 20)
+
+            // Trouble jobs
+            if !stats.troubleJobs.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Needs Attention")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+
+                    ForEach(stats.troubleJobs.prefix(10)) { job in
+                        Button {
+                            store.selectedJobIDs = [job.id]
+                            store.selectJob(job)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: job.status.isLoaded ? "xmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .frame(width: 16)
+
+                                Text(job.displayName)
+                                    .font(.body.weight(.medium))
+                                    .lineLimit(1)
+
+                                Text(job.vendor)
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+
+                                Spacer()
+
+                                Text(troubleDetail(for: job))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if stats.troubleJobs.count > 10 {
+                        Text("and \(stats.troubleJobs.count - 10) more...")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(.vertical, 12)
+                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 24)
+            }
+
+            Spacer()
+
+            Text("Select a job to view its details")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func troubleDetail(for job: LaunchdJob) -> String {
+        if case .loaded(let code) = job.status, let c = code, c != 0 {
+            return ExitCodeInfo.explanation(for: c) ?? "Exit \(c)"
+        }
+        if case .error(let msg) = job.status {
+            return msg
+        }
+        return ""
     }
 }
 
