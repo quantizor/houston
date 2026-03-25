@@ -558,6 +558,7 @@ struct StandardTabView: View {
             Section("Execution") {
                 TextField("Program", text: $editorVM.program)
                     .font(.body.monospaced())
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("Program")?.description ?? "")
 
                 LabeledContent("Arguments") {
@@ -578,17 +579,21 @@ struct StandardTabView: View {
 
                 TextField("Working Directory", text: $editorVM.workingDirectory)
                     .font(.body.monospaced())
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("WorkingDirectory")?.description ?? "")
             }
 
             Section("Scheduling") {
                 Toggle("Run at Load", isOn: $editorVM.runAtLoad)
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("RunAtLoad")?.description ?? "")
 
                 Toggle("Keep Alive", isOn: $editorVM.keepAlive)
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("KeepAlive")?.description ?? "")
 
                 TextField("Start Interval (seconds)", value: $editorVM.startInterval, format: .number)
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("StartInterval")?.description ?? "")
 
                 DisclosureGroup("Calendar Interval") {
@@ -598,6 +603,7 @@ struct StandardTabView: View {
                     calendarIntervalField("Hour (0–23)", value: $editorVM.calendarHour)
                     calendarIntervalField("Minute (0–59)", value: $editorVM.calendarMinute)
                 }
+                .disabled(job.isReadOnly)
                 .help(PlistKey.lookup("StartCalendarInterval")?.description ?? "")
 
                 // Schedule preview — surfaces ScheduleInfo for any job with scheduling configured
@@ -626,10 +632,12 @@ struct StandardTabView: View {
             Section("Logging") {
                 TextField("Standard Out Path", text: $editorVM.standardOutPath)
                     .font(.body.monospaced())
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("StandardOutPath")?.description ?? "")
 
                 TextField("Standard Error Path", text: $editorVM.standardErrorPath)
                     .font(.body.monospaced())
+                    .disabled(job.isReadOnly)
                     .help(PlistKey.lookup("StandardErrorPath")?.description ?? "")
             }
 
@@ -642,6 +650,7 @@ struct StandardTabView: View {
                         ))
                         .font(.body.monospaced())
                         .frame(maxWidth: 200)
+                        .disabled(job.isReadOnly)
 
                         Text("=")
                             .foregroundStyle(.tertiary)
@@ -651,24 +660,29 @@ struct StandardTabView: View {
                             set: { editorVM.environmentVariables[index].value = $0 }
                         ))
                         .font(.body.monospaced())
+                        .disabled(job.isReadOnly)
 
-                        Button(role: .destructive) {
-                            editorVM.environmentVariables.remove(at: index)
-                        } label: {
-                            Image(systemName: "minus.circle")
+                        if !job.isReadOnly {
+                            Button(role: .destructive) {
+                                editorVM.environmentVariables.remove(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Remove variable")
                         }
-                        .buttonStyle(.borderless)
-                        .help("Remove variable")
                     }
                 }
 
-                Button {
-                    editorVM.environmentVariables.append((key: "", value: ""))
-                } label: {
-                    Label("Add Variable", systemImage: "plus.circle")
-                        .font(.caption)
+                if !job.isReadOnly {
+                    Button {
+                        editorVM.environmentVariables.append((key: "", value: ""))
+                    } label: {
+                        Label("Add Variable", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
             }
             .help(PlistKey.lookup("EnvironmentVariables")?.description ?? "")
 
